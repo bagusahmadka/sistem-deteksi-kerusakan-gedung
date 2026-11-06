@@ -44,7 +44,7 @@ from reportlab.lib.units import cm
 # 1. KONFIGURASI APLIKASI STREAMLIT & CUSTOM STYLING (TAILWIND-INSPIRED DESIGN)
 # ==================================================================================================
 st.set_page_config(
-    page_title="SIM-PBG AI | AHSP Jawa Tengah 2023",
+    page_title="Sistem Deteksi Kerusakan Gedung",
     page_icon="🏢",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -675,15 +675,80 @@ CUSTOM_CSS = """
         box-shadow: 0 6px 14px rgba(15, 23, 42, 0.1) !important;
     }
 
+    /* Pastikan Tombol Download Jelas dan Kontras Tinggi */
     div.stDownloadButton > button {
+        background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%) !important;
+        color: #ffffff !important;
+        border: 1.5px solid #334155 !important;
         border-radius: 12px !important;
         font-weight: 800 !important;
         font-size: 0.95rem !important;
+        padding: 0.72rem 1.75rem !important;
         transition: all 0.28s cubic-bezier(0.16, 1, 0.3, 1) !important;
+        box-shadow: 0 4px 14px rgba(15, 23, 42, 0.25) !important;
     }
     div.stDownloadButton > button:hover {
         transform: translateY(-3px) scale(1.01) !important;
-        box-shadow: 0 10px 22px -3px rgba(15, 23, 42, 0.2) !important;
+        background: linear-gradient(135deg, #1e293b 0%, #334155 100%) !important;
+        color: #ffffff !important;
+        box-shadow: 0 10px 22px -3px rgba(15, 23, 42, 0.35) !important;
+    }
+
+    /* Tab Navigasi Kontras Tinggi */
+    div[data-testid="stTabs"] button[data-baseweb="tab"] {
+        color: #334155 !important;
+        font-weight: 700 !important;
+        font-size: 0.95rem !important;
+    }
+    div[data-testid="stTabs"] button[data-baseweb="tab"][aria-selected="true"] {
+        color: #2563eb !important;
+        font-weight: 800 !important;
+        border-bottom-color: #2563eb !important;
+    }
+
+    /* Native Metric Cards High Contrast */
+    div[data-testid="stMetric"] {
+        background: #ffffff !important;
+        border: 1.5px solid #cbd5e1 !important;
+        border-radius: 12px !important;
+        padding: 12px 16px !important;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.03) !important;
+    }
+    div[data-testid="stMetricValue"] {
+        color: #0f172a !important;
+        font-weight: 800 !important;
+    }
+    div[data-testid="stMetricValue"] > div {
+        color: #0f172a !important;
+    }
+    div[data-testid="stMetricLabel"] p {
+        color: #475569 !important;
+        font-weight: 700 !important;
+    }
+
+    /* Form Inputs & Selectbox Kontras Tinggi */
+    div[data-baseweb="input"] {
+        background-color: #ffffff !important;
+        border-color: #cbd5e1 !important;
+    }
+    div[data-baseweb="input"] input {
+        color: #0f172a !important;
+        background-color: #ffffff !important;
+    }
+    div[data-baseweb="select"] > div {
+        background-color: #ffffff !important;
+        color: #0f172a !important;
+    }
+    div[data-baseweb="popover"], div[role="listbox"] {
+        background-color: #ffffff !important;
+        color: #0f172a !important;
+    }
+    div[role="option"] {
+        color: #0f172a !important;
+    }
+    textarea {
+        color: #0f172a !important;
+        background-color: #ffffff !important;
     }
 
     /* File Uploader Visual */
@@ -715,6 +780,105 @@ CUSTOM_CSS = """
     }
     ::-webkit-scrollbar-thumb:hover {
         background: #94a3b8;
+    }
+
+    /* ========================================================================== */
+    /* 11. RESPONSIVE DESIGN (MOBILE & TABLET VIEWPORT FIXES)                     */
+    /* ========================================================================== */
+    @media (max-width: 768px) {
+        /* Optimalisasi padding container agar layar HP tidak kepotong */
+        .block-container {
+            padding-top: 1.25rem !important;
+            padding-bottom: 2rem !important;
+            padding-left: 0.75rem !important;
+            padding-right: 0.75rem !important;
+            max-width: 100% !important;
+        }
+
+        /* Hero Banner responsif */
+        .hero-banner {
+            padding: 20px 16px !important;
+            border-radius: 14px !important;
+            margin-bottom: 16px !important;
+        }
+        .hero-title {
+            font-size: 1.35rem !important;
+            line-height: 1.3 !important;
+        }
+        .hero-subtitle {
+            font-size: 0.88rem !important;
+            line-height: 1.5 !important;
+        }
+
+        /* Penyesuaian Kolom Streamlit (Horizontal Block) di Layar HP */
+        div[data-testid="stHorizontalBlock"] {
+            flex-direction: column !important;
+            flex-wrap: wrap !important;
+            gap: 12px !important;
+        }
+        div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
+            min-width: 100% !important;
+            width: 100% !important;
+            flex: 1 1 100% !important;
+            margin-bottom: 4px !important;
+        }
+
+        /* Metric card responsif memenuhi lebar hp dengan rapi */
+        .metric-container {
+            padding: 14px 16px !important;
+            margin-bottom: 10px !important;
+            width: 100% !important;
+            box-sizing: border-box !important;
+        }
+        .metric-value {
+            font-size: 1.35rem !important;
+            word-break: break-word !important;
+        }
+        .metric-label {
+            font-size: 0.76rem !important;
+        }
+
+        /* Grid Status Penilaian IKBG (2 kolom di HP) */
+        .ikbg-status-grid {
+            grid-template-columns: repeat(2, 1fr) !important;
+            gap: 8px !important;
+        }
+        .ikbg-status-card {
+            padding: 10px 6px !important;
+            font-size: 0.8rem !important;
+        }
+
+        /* Card Container Padding */
+        .tw-card {
+            padding: 16px !important;
+            border-radius: 14px !important;
+            margin-bottom: 16px !important;
+        }
+
+        /* Tombol di HP dibuat full width agar mudah disentuh */
+        div.stButton > button, div.stDownloadButton > button {
+            width: 100% !important;
+            padding: 0.7rem 1rem !important;
+            font-size: 0.92rem !important;
+        }
+
+        /* Tabel & Dataframe dapat di-scroll horizontal tanpa membuat halaman kepotong */
+        div[data-testid="stTable"],
+        div[data-testid="stDataFrame"],
+        .stTable,
+        table {
+            width: 100% !important;
+            overflow-x: auto !important;
+            -webkit-overflow-scrolling: touch !important;
+            display: block !important;
+        }
+
+        /* Gambar responsif */
+        img {
+            max-width: 100% !important;
+            height: auto !important;
+            border-radius: 10px !important;
+        }
     }
 </style>
 """
@@ -2155,7 +2319,7 @@ class PDFReportGenerator:
         # 1. KOP SURAT RESMI
         story.append(Paragraph("PEMERINTAH PROVINSI JAWA TENGAH", kop_title_style))
         story.append(Paragraph("DINAS PEKERJAAN UMUM BINA MARGA DAN CIPTA KARYA", kop_title_style))
-        story.append(Paragraph("SISTEM INFORMASI PEMELIHARAAN BANGUNAN GEDUNG BERBASIS AI (SIM-PBG AI)", kop_sub_style))
+        story.append(Paragraph("SISTEM DETEKSI KERUSAKAN GEDUNG", kop_sub_style))
         story.append(Paragraph("Standar Acuan: Pedoman AHSP Gedung & Perumahan Provinsi Jawa Tengah Tahun 2023", kop_sub_style))
         story.append(Spacer(1, 4))
         story.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor('#0F172A'), spaceBefore=2, spaceAfter=6))
@@ -2534,7 +2698,7 @@ st.sidebar.markdown("""
     <div style="display: inline-block; padding: 14px; background: linear-gradient(135deg, #1e293b, #0f172a); border-radius: 20px; box-shadow: 0 8px 18px rgba(15, 23, 42, 0.25); border: 1px solid rgba(255,255,255,0.1); margin-bottom: 8px;">
         <span style="font-size: 2.2rem;">🏢</span>
     </div>
-    <h3 style="margin: 6px 0 0 0; color: #0f172a; font-weight: 900; letter-spacing: -0.5px;">SIM-PBG AI</h3>
+    <h3 style="margin: 6px 0 0 0; color: #0f172a; font-weight: 900; letter-spacing: -0.5px; font-size: 1.15rem; line-height: 1.3;">Sistem Deteksi Kerusakan Gedung</h3>
     <div class="live-badge" style="margin-top: 6px; padding: 2px 10px; font-size: 0.72rem;">
         <span class="live-dot"></span> SISTEM ONLINE
     </div>
@@ -2629,7 +2793,7 @@ if menu == "📊 Dashboard Utama & Input Data":
                         <span class="live-dot"></span> KONEKSI AI AGENT SIAP
                     </div>
                 </div>
-                <div class="hero-title">Sistem Deteksi Kerusakan & Estimasi AHSP Jateng</div>
+                <div class="hero-title">Sistem Deteksi Kerusakan Gedung</div>
                 <div class="hero-subtitle">
                     Aplikasi pemeliharaan bangunan gedung terpadu berbasis AI Agent Antigravity dengan kalkulasi Rencana Anggaran Biaya (RAB) otomatis serta formulir penilaian kondisi fisik dan fungsi (IKBG) sesuai standar AHSP Dinas PU Bina Marga & Cipta Karya Provinsi Jawa Tengah Tahun 2023.
                 </div>
@@ -3611,7 +3775,7 @@ elif menu == "📑 Panduan AHSP Jateng 2023":
 # ==================================================================================================
 st.markdown("""
 <div style="text-align: center; margin-top: 50px; padding: 24px 0; border-top: 1.5px solid #cbd5e1; font-size: 0.86rem; color: #1e293b; font-weight: 500;">
-    <b style="color: #0f172a; font-weight: 800;">Sistem Informasi Pemeliharaan Bangunan Gedung Menyeluruh Berbasis AI (SIM-PBG AI)</b><br>
+    <b style="color: #0f172a; font-weight: 800;">Sistem Deteksi Kerusakan Gedung</b><br>
     Program Skripsi Teknik Sipil Digital | Standar Acuan: <span style="color: #0f172a; font-weight: 700;">AHSP Dinas PU Bina Marga & Cipta Karya Jawa Tengah 2023</span>
 </div>
 """, unsafe_allow_html=True)

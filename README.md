@@ -1,5 +1,5 @@
 ---
-title: Sistem Pemeliharaan Bangunan Gedung AHSP Jateng
+title: Sistem Deteksi Kerusakan Gedung
 emoji: 🏢
 colorFrom: blue
 colorTo: indigo
@@ -9,9 +9,8 @@ app_file: app.py
 pinned: false
 ---
 
-# SISTEM INFORMASI PEMELIHARAAN BANGUNAN GEDUNG MENYELURUH BERBASIS AI
-## (Deteksi Kerusakan & Estimasi AHSP Jawa Tengah)
-### Aplikasi Skripsi Teknik Sipil Digital
+# SISTEM DETEKSI KERUSAKAN GEDUNG
+### Aplikasi Skripsi Teknik Sipil Digital (Deteksi Kerusakan & Estimasi AHSP Jawa Tengah)
 
 Aplikasi website komprehensif untuk inspeksi kondisi fisik bangunan gedung, identifikasi kerusakan otomatis menggunakan AI Agent Antigravity, serta perhitungan Rencana Anggaran Biaya (RAB) pemeliharaan mengacu pada standar resmi **AHSP Dinas PU Bina Marga & Cipta Karya Provinsi Jawa Tengah Tahun 2023** (berdasarkan Permen PUPR No. 1/PRT/M/2022 & Permen PUPR No. 24/PRT/M/2008).
 
