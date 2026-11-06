@@ -636,62 +636,104 @@ CUSTOM_CSS = """
     }
 
     /* ========================================================================== */
-    /* 10. TOMBOL STREAMLIT DENGAN ANIMASI SHIMMER & DEPTH                        */
+    /* 10. TOMBOL STREAMLIT (AKSI, ANALISIS, UNDUH EXCEL, PDF, CSV)               */
     /* ========================================================================== */
+    
+    /* Aturan Global Tombol: Pastikan teks di dalam tombol SELALU terlihat kontras */
+    div.stButton > button,
+    div.stDownloadButton > button {
+        border-radius: 12px !important;
+        font-weight: 800 !important;
+        font-size: 0.95rem !important;
+        padding: 0.7rem 1.6rem !important;
+        transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+        cursor: pointer !important;
+        position: relative !important;
+    }
+
+    /* 1. Tombol Primary (Analisis Deteksi AI): Biru Elektrik Modern */
     div.stButton > button[kind="primary"] {
         background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 50%, #3b82f6 100%) !important;
-        background-size: 200% 200% !important;
         color: #ffffff !important;
-        font-weight: 800 !important;
-        font-size: 1rem !important;
         border: none !important;
-        border-radius: 12px !important;
-        padding: 0.72rem 1.75rem !important;
-        transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
-        box-shadow: 0 6px 20px -2px rgba(37, 99, 235, 0.45) !important;
-        position: relative !important;
-        overflow: hidden !important;
+        box-shadow: 0 4px 16px rgba(37, 99, 235, 0.45) !important;
+    }
+    
+    /* 2. Tombol Download Excel (Primary): Hijau Emerald Standar Excel dengan Teks Putih Tebal */
+    div.stDownloadButton > button[kind="primary"],
+    div.stDownloadButton > button[data-testid="baseButton-primary"] {
+        background: linear-gradient(135deg, #15803d 0%, #16a34a 100%) !important;
+        color: #ffffff !important;
+        border: 1.5px solid #15803d !important;
+        box-shadow: 0 4px 16px rgba(22, 163, 74, 0.35) !important;
     }
 
-    div.stButton > button[kind="primary"]:hover {
-        transform: translateY(-3px) scale(1.01) !important;
-        box-shadow: 0 14px 28px -3px rgba(37, 99, 235, 0.6) !important;
-        filter: brightness(1.08) !important;
+    /* 3. Tombol Download PDF (Secondary): Biru Royal Standar Dokumen dengan Teks Putih Tebal */
+    div.stDownloadButton > button[kind="secondary"],
+    div.stDownloadButton > button[data-testid="baseButton-secondary"] {
+        background: linear-gradient(135deg, #1e40af 0%, #2563eb 100%) !important;
+        color: #ffffff !important;
+        border: 1.5px solid #1e40af !important;
+        box-shadow: 0 4px 16px rgba(37, 99, 235, 0.35) !important;
     }
 
+    /* 4. Tombol Download Lainnya (CSV / Default): Biru Slate Solid dengan Teks Putih */
+    div.stDownloadButton > button {
+        background: linear-gradient(135deg, #0369a1 0%, #0284c7 100%) !important;
+        color: #ffffff !important;
+        border: 1.5px solid #0284c7 !important;
+        box-shadow: 0 4px 16px rgba(3, 105, 161, 0.3) !important;
+    }
+
+    /* 5. Tombol Sekunder Non-Download (Hapus ID, dll): Putih Bersih dengan Border Slate */
     div.stButton > button[kind="secondary"] {
-        border-radius: 12px !important;
-        font-weight: 700 !important;
-        font-size: 0.95rem !important;
-        transition: all 0.25s ease !important;
-        border: 1.5px solid #cbd5e1 !important;
         background: #ffffff !important;
         color: #0f172a !important;
-    }
-    div.stButton > button[kind="secondary"]:hover {
-        transform: translateY(-2px) !important;
-        border-color: #2563eb !important;
-        color: #2563eb !important;
-        box-shadow: 0 6px 14px rgba(15, 23, 42, 0.1) !important;
+        border: 1.5px solid #cbd5e1 !important;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05) !important;
     }
 
-    /* Pastikan Tombol Download Jelas dan Kontras Tinggi */
-    div.stDownloadButton > button {
-        background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%) !important;
+    /* ========================================================================== */
+    /* PEMBERSIH WARNA TEKS TOMBOL: Override Paksa Seluruh Tag Paragraf di Tombol */
+    /* ========================================================================== */
+    div.stDownloadButton > button *,
+    div.stDownloadButton > button p,
+    div.stDownloadButton > button span,
+    div.stDownloadButton > button div,
+    div.stDownloadButton > button [data-testid="stMarkdownContainer"] *,
+    div.stDownloadButton > button [data-testid="stMarkdownContainer"] p,
+    div.stButton > button[kind="primary"] *,
+    div.stButton > button[kind="primary"] p,
+    div.stButton > button[kind="primary"] span,
+    div.stButton > button[kind="primary"] [data-testid="stMarkdownContainer"] *,
+    div.stButton > button[kind="primary"] [data-testid="stMarkdownContainer"] p {
         color: #ffffff !important;
-        border: 1.5px solid #334155 !important;
-        border-radius: 12px !important;
         font-weight: 800 !important;
-        font-size: 0.95rem !important;
-        padding: 0.72rem 1.75rem !important;
-        transition: all 0.28s cubic-bezier(0.16, 1, 0.3, 1) !important;
-        box-shadow: 0 4px 14px rgba(15, 23, 42, 0.25) !important;
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25) !important;
     }
+
+    div.stButton > button[kind="secondary"] *,
+    div.stButton > button[kind="secondary"] p,
+    div.stButton > button[kind="secondary"] span,
+    div.stButton > button[kind="secondary"] [data-testid="stMarkdownContainer"] p {
+        color: #0f172a !important;
+        font-weight: 800 !important;
+    }
+
+    /* Hover States Efek Angkat Halus */
+    div.stButton > button:hover,
     div.stDownloadButton > button:hover {
-        transform: translateY(-3px) scale(1.01) !important;
-        background: linear-gradient(135deg, #1e293b 0%, #334155 100%) !important;
-        color: #ffffff !important;
-        box-shadow: 0 10px 22px -3px rgba(15, 23, 42, 0.35) !important;
+        transform: translateY(-2px) scale(1.01) !important;
+        filter: brightness(1.08) !important;
+        box-shadow: 0 8px 22px rgba(15, 23, 42, 0.25) !important;
+    }
+    div.stButton > button[kind="secondary"]:hover {
+        background: #f8fafc !important;
+        border-color: #2563eb !important;
+        color: #2563eb !important;
+    }
+    div.stButton > button[kind="secondary"]:hover * {
+        color: #2563eb !important;
     }
 
     /* Tab Navigasi Kontras Tinggi */
@@ -2244,7 +2286,8 @@ class PDFReportGenerator:
         cls,
         data_list: List[Dict[str, Any]],
         title_doc: str = "Laporan Inspeksi Gedung",
-        annotated_image_bytes: Optional[bytes] = None
+        annotated_image_bytes: Optional[bytes] = None,
+        signer_info: Optional[Dict[str, str]] = None
     ) -> bytes:
         buffer = io.BytesIO()
         doc = SimpleDocTemplate(
@@ -2590,12 +2633,45 @@ class PDFReportGenerator:
 
         story.append(Spacer(1, 12))
 
+        if not signer_info:
+            signer_info = {}
+
+        # 1. Surveyor / Penguji Lapangan
+        s_nama = signer_info.get("surveyor_name") or surveyor_name or ""
+        s_nip = signer_info.get("surveyor_nip") or ""
+        if s_nama and s_nama not in ["Surveyor Lapangan", "-", ""]:
+            sig_s_nama = f"<b><u>{s_nama}</u></b>"
+            sig_s_nip = f"NIM/NIP. {s_nip}" if s_nip else "NIM/NIP. ....................."
+        else:
+            sig_s_nama = "<u>( .................................................. )</u>"
+            sig_s_nip = "NIM/NIP."
+
+        # 2. Dosen Pembimbing / Penguji
+        d_nama = signer_info.get("dosen_name") or ""
+        d_nip = signer_info.get("dosen_nip") or ""
+        if d_nama:
+            sig_d_nama = f"<b><u>{d_nama}</u></b>"
+            sig_d_nip = f"NIP. {d_nip}" if d_nip else "NIP. ....................."
+        else:
+            sig_d_nama = "<u>( .................................................. )</u>"
+            sig_d_nip = "NIP."
+
+        # 3. Pengelola Gedung / PPK
+        p_nama = signer_info.get("ppk_name") or ""
+        p_nip = signer_info.get("ppk_nip") or ""
+        if p_nama:
+            sig_p_nama = f"<b><u>{p_nama}</u></b>"
+            sig_p_nip = f"NIP. {p_nip}" if p_nip else "NIP. ....................."
+        else:
+            sig_p_nama = "<u>( .................................................. )</u>"
+            sig_p_nip = "NIP."
+
         story.append(KeepTogether([
             Table([
                 [
-                    Paragraph(f"Dibuat Oleh,<br/><b>Surveyor / Penguji Lapangan</b><br/><br/><br/><br/>{sig_surveyor_text}<br/>NIM/NIP.", body_small),
-                    Paragraph("Mengetahui,<br/><b>Dosen Pembimbing / Penguji</b><br/><br/><br/><br/><u>( .................................................. )</u><br/>NIP.", body_small),
-                    Paragraph("Disetujui Oleh,<br/><b>Pengelola Gedung / PPK</b><br/><br/><br/><br/><u>( .................................................. )</u><br/>NIP.", body_small)
+                    Paragraph(f"Dibuat Oleh,<br/><b>Surveyor / Penguji Lapangan</b><br/><br/><br/><br/>{sig_s_nama}<br/>{sig_s_nip}", body_small),
+                    Paragraph(f"Mengetahui,<br/><b>Dosen Pembimbing / Penguji</b><br/><br/><br/><br/>{sig_d_nama}<br/>{sig_d_nip}", body_small),
+                    Paragraph(f"Disetujui Oleh,<br/><b>Pengelola Gedung / PPK</b><br/><br/><br/><br/>{sig_p_nama}<br/>{sig_p_nip}", body_small)
                 ]
             ], colWidths=[170, 175, 175], style=[
                 ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
@@ -2814,29 +2890,91 @@ if menu == "📊 Dashboard Utama & Input Data":
         </div>
         """, unsafe_allow_html=True)
 
-        with st.expander("🏢 Identitas Bangunan & Surveyor Lapangan (Dapat Diisi Bebas)", expanded=True):
-            st.caption("ℹ️ *Aplikasi ini bersifat terbuka untuk umum (tanpa login/role). Anda dapat mengisi nama gedung dan pemeriksa secara bebas sesuai kebutuhan inspeksi.*")
-            nama_gedung_input = st.text_input(
-                "Nama Bangunan Gedung / Objek Inspeksi:",
-                value="",
-                placeholder="Contoh: Gedung Rektorat, Rumah Tinggal, Ruko, dsb.",
-                help="Ketik nama fasilitas atau bangunan gedung yang sedang diinspeksi."
-            )
-            col_loc1, col_loc2 = st.columns(2)
-            with col_loc1:
+        with st.expander("🏢 Identitas Bangunan & Lembar Pengesahan Laporan (Dapat Diisi Bebas)", expanded=True):
+            st.caption("ℹ️ *Aplikasi terbuka untuk umum. Anda dapat mengisi identitas gedung dan nama pihak penandatangan berita acara (Surveyor, Dosen Pembimbing, PPK) untuk dicetak langsung pada lembar pengesahan laporan PDF.*")
+            col_id1, col_id2 = st.columns(2)
+            with col_id1:
+                nama_gedung_input = st.text_input(
+                    "Nama Bangunan Gedung / Objek Inspeksi:",
+                    value=st.session_state.get("inp_gedung", ""),
+                    placeholder="Contoh: Gedung Rektorat, Rumah Tinggal, Ruko, dsb.",
+                    help="Ketik nama fasilitas atau bangunan gedung yang sedang diinspeksi."
+                )
+            with col_id2:
                 lokasi_lantai_input = st.text_input(
                     "Lokasi / Lantai / Ruangan:",
-                    value="",
+                    value=st.session_state.get("inp_lokasi", ""),
                     placeholder="Contoh: Lantai 2 - Ruang 204, Selasar Barat...",
                     help="Ketik spesifikasi zona, lantai, atau ruangan lokasi kerusakan."
                 )
-            with col_loc2:
+
+            st.markdown("<p style='font-size:0.86rem; font-weight:800; color:#0f172a; margin:10px 0 2px 0;'>✍️ Data Pihak Penandatangan Laporan PDF (Opsional):</p>", unsafe_allow_html=True)
+            col_sig1, col_sig2 = st.columns(2)
+            with col_sig1:
                 surveyor_input = st.text_input(
-                    "Nama Surveyor / Pemeriksa:",
-                    value="",
-                    placeholder="Contoh: Nama Anda / Tim Penilai...",
-                    help="Ketik nama pemeriksa lapangan yang akan tercantum pada laporan dan lembar tanda tangan."
+                    "1. Surveyor / Penguji Lapangan:",
+                    value=st.session_state.get("inp_surveyor", ""),
+                    placeholder="Contoh: Ahmad Fajar, S.T. / Nama Anda",
+                    help="Nama pemeriksa yang menyusun laporan."
                 )
+            with col_sig2:
+                surveyor_nip_input = st.text_input(
+                    "NIM / NIP Surveyor:",
+                    value=st.session_state.get("inp_surveyor_nip", ""),
+                    placeholder="Contoh: NIM. 5112419001",
+                    help="Nomor Induk Mahasiswa atau NIP surveyor."
+                )
+
+            col_sig3, col_sig4 = st.columns(2)
+            with col_sig3:
+                dosen_input = st.text_input(
+                    "2. Dosen Pembimbing / Penguji:",
+                    value=st.session_state.get("inp_dosen", ""),
+                    placeholder="Contoh: Ir. Budi Santoso, M.T. (Opsional)",
+                    help="Nama Dosen Pembimbing / Penguji untuk lembar pengesahan."
+                )
+            with col_sig4:
+                dosen_nip_input = st.text_input(
+                    "NIP Dosen Pembimbing / Penguji:",
+                    value=st.session_state.get("inp_dosen_nip", ""),
+                    placeholder="Contoh: NIP. 19750812 200003 1 002 (Opsional)",
+                    help="Nomor Induk Pegawai Dosen Pembimbing / Penguji."
+                )
+
+            col_sig5, col_sig6 = st.columns(2)
+            with col_sig5:
+                ppk_input = st.text_input(
+                    "3. Pengelola Gedung / PPK:",
+                    value=st.session_state.get("inp_ppk", ""),
+                    placeholder="Contoh: Hendra Kusuma, S.T., M.Eng. (Opsional)",
+                    help="Nama Pengelola Gedung atau Pejabat Pembuat Komitmen (PPK)."
+                )
+            with col_sig6:
+                ppk_nip_input = st.text_input(
+                    "NIP Pengelola Gedung / PPK:",
+                    value=st.session_state.get("inp_ppk_nip", ""),
+                    placeholder="Contoh: NIP. 19820415 200812 1 001 (Opsional)",
+                    help="Nomor Induk Pegawai Pengelola Gedung / PPK."
+                )
+
+            # Simpan ke session_state agar nilai tetap tersimpan saat navigasi tab/refresh
+            st.session_state["inp_gedung"] = nama_gedung_input
+            st.session_state["inp_lokasi"] = lokasi_lantai_input
+            st.session_state["inp_surveyor"] = surveyor_input
+            st.session_state["inp_surveyor_nip"] = surveyor_nip_input
+            st.session_state["inp_dosen"] = dosen_input
+            st.session_state["inp_dosen_nip"] = dosen_nip_input
+            st.session_state["inp_ppk"] = ppk_input
+            st.session_state["inp_ppk_nip"] = ppk_nip_input
+
+            st.session_state["signer_info"] = {
+                "surveyor_name": surveyor_input.strip() if surveyor_input else "",
+                "surveyor_nip": surveyor_nip_input.strip() if surveyor_nip_input else "",
+                "dosen_name": dosen_input.strip() if dosen_input else "",
+                "dosen_nip": dosen_nip_input.strip() if dosen_nip_input else "",
+                "ppk_name": ppk_input.strip() if ppk_input else "",
+                "ppk_nip": ppk_nip_input.strip() if ppk_nip_input else "",
+            }
 
         uploaded_file = st.file_uploader(
             "1. Unggah Foto Kerusakan (JPG / PNG):",
@@ -3321,7 +3459,8 @@ if menu == "📊 Dashboard Utama & Input Data":
             single_record_pdf = PDFReportGenerator.generate_pdf_report(
                 [res],
                 title_doc=f"Laporan Penilaian - {res.get('elemen_gedung')}",
-                annotated_image_bytes=st.session_state.get("annotated_img_bytes")
+                annotated_image_bytes=st.session_state.get("annotated_img_bytes"),
+                signer_info=st.session_state.get("signer_info")
             )
             st.download_button(
                 label="📄 Unduh Laporan Resmi & Penilaian (PDF)",
@@ -3611,7 +3750,15 @@ elif menu == "📜 Riwayat Inspeksi Gedung":
         st.dataframe(df_display, use_container_width=True, hide_index=True)
 
         # Baris Tombol Aksi Ekspor (Excel, PDF, CSV) & Hapus Data
-        col_act1, col_act2, col_act3, col_act4, col_act5 = st.columns([1.6, 1.6, 1.1, 1.0, 1.1])
+        st.markdown("""
+        <div style="background: #ffffff; border: 1.5px solid #cbd5e1; border-radius: 14px; padding: 16px 20px; margin-top: 20px; margin-bottom: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.03);">
+            <div style="font-size: 0.95rem; font-weight: 800; color: #0f172a; display: flex; align-items: center; gap: 8px;">
+                <span>📥</span> <span>Opsi Ekspor Laporan Resmi & Arsip Pemeriksaan:</span>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        col_act1, col_act2, col_act3 = st.columns(3)
 
         with col_act1:
             # Ekspor Excel (.xlsx) dengan Formulir Penilaian Kondisi (IKBG) & RAB
@@ -3619,7 +3766,7 @@ elif menu == "📜 Riwayat Inspeksi Gedung":
                 filtered_records, title_doc="Laporan Penilaian Gedung Jawa Tengah"
             )
             st.download_button(
-                label="📊 Ekspor Penilaian & RAB (Excel .xlsx)",
+                label="📊 Ekspor Formulir IKBG & RAB (Excel)",
                 data=excel_data,
                 file_name=f"Penilaian_IKBG_Jateng_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -3630,10 +3777,12 @@ elif menu == "📜 Riwayat Inspeksi Gedung":
         with col_act2:
             # Ekspor PDF Resmi ReportLab
             pdf_data = PDFReportGenerator.generate_pdf_report(
-                filtered_records, title_doc="Laporan Pemeliharaan Gedung Jawa Tengah"
+                filtered_records,
+                title_doc="Laporan Pemeliharaan Gedung Jawa Tengah",
+                signer_info=st.session_state.get("signer_info")
             )
             st.download_button(
-                label="📄 Ekspor Laporan PDF Resmi (ReportLab)",
+                label="📄 Ekspor Berita Acara Resmi (PDF)",
                 data=pdf_data,
                 file_name=f"Laporan_Resmi_PBG_Jateng_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
                 mime="application/pdf",
@@ -3645,26 +3794,31 @@ elif menu == "📜 Riwayat Inspeksi Gedung":
             # Ekspor CSV
             csv_data = df_all.to_csv(index=False).encode('utf-8')
             st.download_button(
-                label="📥 Unduh CSV",
+                label="📑 Unduh Database Arsip (CSV)",
                 data=csv_data,
                 file_name=f"Data_Inspeksi_{datetime.now().strftime('%Y%m%d')}.csv",
                 mime="text/csv",
                 use_container_width=True
             )
 
-        with col_act4:
-            # Hapus Satu Data Tertentu
-            delete_id = st.number_input("Hapus ID:", min_value=1, step=1, label_visibility="collapsed")
-            if st.button("🗑️ Hapus ID", use_container_width=True):
-                if DatabaseManager.delete_riwayat(delete_id):
-                    st.success(f"Catatan ID #{delete_id} berhasil dihapus.")
-                    st.rerun()
-                else:
-                    st.error(f"ID #{delete_id} tidak ditemukan.")
+        st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+        col_mgt1, col_mgt2 = st.columns([2.2, 1.0])
 
-        with col_act5:
+        with col_mgt1:
+            col_id_del, col_btn_del = st.columns([2, 1])
+            with col_id_del:
+                delete_id = st.number_input("Hapus ID:", min_value=1, step=1, label_visibility="collapsed", placeholder="Ketik ID...")
+            with col_btn_del:
+                if st.button("🗑️ Hapus ID", use_container_width=True):
+                    if DatabaseManager.delete_riwayat(delete_id):
+                        st.success(f"Catatan ID #{delete_id} berhasil dihapus.")
+                        st.rerun()
+                    else:
+                        st.error(f"ID #{delete_id} tidak ditemukan.")
+
+        with col_mgt2:
             # Kosongkan Database
-            if st.button("⚠️ Reset Data", type="secondary", use_container_width=True):
+            if st.button("⚠️ Reset Seluruh Data", type="secondary", use_container_width=True):
                 DatabaseManager.clear_all()
                 st.warning("Seluruh riwayat berhasil dikosongkan.")
                 st.rerun()
