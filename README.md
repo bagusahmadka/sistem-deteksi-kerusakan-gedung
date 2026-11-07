@@ -12,14 +12,14 @@ pinned: false
 # SISTEM DETEKSI KERUSAKAN GEDUNG
 ### Aplikasi Skripsi Teknik Sipil Digital (Deteksi Kerusakan & Estimasi AHSP Jawa Tengah)
 
-Aplikasi website komprehensif untuk inspeksi kondisi fisik bangunan gedung, identifikasi kerusakan otomatis menggunakan AI Agent Antigravity, serta perhitungan Rencana Anggaran Biaya (RAB) pemeliharaan mengacu pada standar resmi **AHSP Dinas PU Bina Marga & Cipta Karya Provinsi Jawa Tengah Tahun 2023** (berdasarkan Permen PUPR No. 1/PRT/M/2022 & Permen PUPR No. 24/PRT/M/2008).
+Aplikasi website komprehensif untuk inspeksi kondisi fisik bangunan gedung, identifikasi kerusakan otomatis menggunakan model Deep Learning YOLOv8, serta perhitungan Rencana Anggaran Biaya (RAB) pemeliharaan mengacu pada standar resmi **AHSP Dinas PU Bina Marga & Cipta Karya Provinsi Jawa Tengah Tahun 2023** (berdasarkan Permen PUPR No. 1/PRT/M/2022 & Permen PUPR No. 24/PRT/M/2008).
 
 ---
 
 ## 🏛️ Spesifikasi Arsitektur Sistem
 
 1. **Framework Utama**: Streamlit (Python) sebagai Frontend interaktif sekaligus Backend controller.
-2. **Integrasi AI Agent**: Menggunakan library `requests` untuk melakukan HTTP POST JSON API Call ke AI Agent Antigravity dengan data citra terenkode Base64.
+2. **Mesin AI Computer Vision**: Model Deep Learning YOLOv8 (`weights/best.pt`) untuk deteksi anomali cacat beton (Crack, Spalling, Exposed Rebar, Efflorescence).
 3. **Database Relasional**: SQLite3 (`riwayat_kerusakan`) untuk persistensi data hasil inspeksi dan penilaian kondisi gedung.
 4. **Mesin Ekspor Excel (.xlsx)**: Menggunakan library `openpyxl` untuk menghasilkan lembar penilaian kondisi fisik dan fungsi (IKBG) sesuai format formulir standar teknik sipil:
    - Tabel Penilaian Fisik (Baik 79.5-100%, Cukup 49.5-79.49%, Rusak 0-49.49%)

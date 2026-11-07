@@ -3,7 +3,7 @@
 SISTEM INFORMASI PEMELIHARAAN BANGUNAN GEDUNG MENYELURUH BERBASIS AI
 (Deteksi Kerusakan & Estimasi AHSP Jawa Tengah)
 Aplikasi Website Skripsi Teknik Sipil Digital
-Framework: Streamlit | AI Agent: Antigravity API (requests) | Database: SQLite3 | Ekspor: ReportLab
+Framework: Streamlit | AI Model: YOLOv8 Computer Vision | Database: SQLite3 | Ekspor: ReportLab
 ====================================================================================================
 """
 
@@ -1338,10 +1338,10 @@ class AHSPKnowledgeBase:
 
 
 # ==================================================================================================
-# 4. INTEGRASI AI AGENT ANTIGRAVITY (HTTP POST CALL VIA requests)
+# 4. INTEGRASI MESIN DETEKSI AI YOLOV8 & COMPUTER VISION (VIA requests / lokal)
 # ==================================================================================================
 class AIAgentClient:
-    """Kelas integrasi untuk melakukan HTTP POST API Call ke AI Agent Antigravity."""
+    """Kelas integrasi untuk inferensi model YOLOv8 dan modul penilaian AHSP Jawa Tengah."""
 
     DEFAULT_ENDPOINT = "http://localhost:8000/api/analyze-damage"
 
@@ -1357,14 +1357,14 @@ class AIAgentClient:
         force_simulation: bool = False
     ) -> Dict[str, Any]:
         """
-        Mengubah foto ke format Base64 dan memanggil endpoint AI Agent Antigravity
-        menggunakan library requests via protokol HTTP POST JSON.
+        Mengubah foto ke format Base64 dan memproses citra melalui inferensi YOLOv8
+        atau endpoint API eksternal via protokol HTTP POST JSON.
         """
         # Konversi file gambar ke Base64 string
         base64_encoded_img = base64.b64encode(image_bytes).decode("utf-8")
         current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        # Payload sesuai protokol Antigravity AI Agent
+        # Payload sesuai protokol API
         payload = {
             "image_base64": base64_encoded_img,
             "filename": filename,
@@ -1625,7 +1625,7 @@ class AIAgentClient:
 
         return {
             "status": "success",
-            "agent_id": "antigravity-civil-vision-agent-v2",
+            "agent_id": "yolov8-civil-vision-engine",
             "mode": mode_label,
             "is_live_api": False,
             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -2797,12 +2797,12 @@ st.sidebar.markdown("---")
 # Pengaturan Integrasi AI Agent (Disembunyikan secara rapi di bawah toggle Pengembang agar presentasi sidang bersih)
 dev_mode = st.sidebar.checkbox("🛠️ Mode Pengembang (API Dev)", value=False, help="Aktifkan jika ingin menghubungkan aplikasi ke server HTTP POST API eksternal.")
 if dev_mode:
-    with st.sidebar.expander("⚙️ Konfigurasi AI Agent Antigravity", expanded=True):
-        st.markdown("<p style='font-size:0.84rem; color:#1e293b; font-weight:600;'>Konfigurasi HTTP POST API Call library <code>requests</code> ke AI Agent Antigravity.</p>", unsafe_allow_html=True)
+    with st.sidebar.expander("⚙️ Konfigurasi Server AI (Opsional)", expanded=True):
+        st.markdown("<p style='font-size:0.84rem; color:#1e293b; font-weight:600;'>Konfigurasi HTTP POST API Call library <code>requests</code> ke server deteksi eksternal.</p>", unsafe_allow_html=True)
         api_endpoint_input = st.text_input(
-            "AI Agent Endpoint URL:",
+            "Server Endpoint URL:",
             value="http://localhost:8000/api/analyze-damage",
-            help="Alamat HTTP POST server Antigravity Agent"
+            help="Alamat HTTP POST server deteksi AI"
         )
         api_token_input = st.text_input(
             "Bearer API Key (Opsional):",
@@ -2826,7 +2826,7 @@ st.sidebar.markdown("""
         <span style="font-weight:800; color:#0f172a;">STATUS SISTEM AKTIF</span>
     </div>
     <b style="color:#0f172a;">Database:</b> SQLite3 (<code>pemeliharaan_gedung.db</code>)<br>
-    <b style="color:#0f172a;">Engine:</b> Antigravity Civil Vision AI<br>
+    <b style="color:#0f172a;">Engine:</b> Deep Learning YOLOv8<br>
     <b style="color:#0f172a;">Standar Acuan:</b> Pergub Jateng AHSP 2023
 </div>
 """, unsafe_allow_html=True)
@@ -2872,17 +2872,51 @@ if menu == "📊 Dashboard Utama & Input Data":
                 <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px;">
                     <span class="badge-ahsp" style="background:#2563eb; color:#ffffff; border:none; padding:4px 12px;">SKRIPSI TEKNIK SIPIL DIGITAL</span>
                     <div class="live-badge" style="margin-bottom:0;">
-                        <span class="live-dot"></span> KONEKSI AI AGENT SIAP
+                        <span class="live-dot"></span> YOLOV8 ENGINE SIAP
                     </div>
                 </div>
                 <div class="hero-title">Sistem Deteksi Kerusakan Gedung</div>
                 <div class="hero-subtitle">
-                    Aplikasi pemeliharaan bangunan gedung terpadu berbasis AI Agent Antigravity dengan kalkulasi Rencana Anggaran Biaya (RAB) otomatis serta formulir penilaian kondisi fisik dan fungsi (IKBG) sesuai standar AHSP Dinas PU Bina Marga & Cipta Karya Provinsi Jawa Tengah Tahun 2023.
+                    Aplikasi pemeliharaan bangunan gedung terpadu berbasis Deep Learning YOLOv8 dengan kalkulasi Rencana Anggaran Biaya (RAB) otomatis serta formulir penilaian kondisi fisik dan fungsi (IKBG) sesuai standar AHSP Dinas PU Bina Marga & Cipta Karya Provinsi Jawa Tengah Tahun 2023.
                 </div>
             </div>
         </div>
     </div>
     """, unsafe_allow_html=True)
+
+    # Accordion Panduan Alur Penggunaan Aplikasi (3 Langkah Praktis)
+    with st.expander("ℹ️ Panduan Alur Penggunaan Aplikasi (3 Langkah Mudah)", expanded=False):
+        st.markdown("""
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; margin-top: 4px;">
+            <div style="background: #eff6ff; border: 1.5px solid #bfdbfe; border-radius: 12px; padding: 14px 16px;">
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+                    <span style="background: #2563eb; color: #ffffff; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 800;">1</span>
+                    <b style="color: #1e40af; font-size: 0.88rem;">Isi Identitas & Pihak Penandatangan</b>
+                </div>
+                <p style="font-size: 0.82rem; color: #1e293b; margin: 0; line-height: 1.5;">
+                    Lengkapi nama gedung, lokasi/ruangan, serta nama surveyor/NIM, dosen pembimbing, dan pengelola gedung untuk dicetak di lembar pengesahan resmi.
+                </p>
+            </div>
+            <div style="background: #f0fdf4; border: 1.5px solid #bbf7d0; border-radius: 12px; padding: 14px 16px;">
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+                    <span style="background: #16a34a; color: #ffffff; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 800;">2</span>
+                    <b style="color: #166534; font-size: 0.88rem;">Pilih Foto & Tentukan Dimensi / Volume</b>
+                </div>
+                <p style="font-size: 0.82rem; color: #1e293b; margin: 0; line-height: 1.5;">
+                    Unggah foto kerusakan elemen gedung (atau jepret kamera HP). Masukkan volume opname langsung atau hitung otomatis via dimensi Panjang × Lebar.
+                </p>
+            </div>
+            <div style="background: #faf5ff; border: 1.5px solid #e9d5ff; border-radius: 12px; padding: 14px 16px;">
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+                    <span style="background: #9333ea; color: #ffffff; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 800;">3</span>
+                    <b style="color: #7e22ce; font-size: 0.88rem;">Deteksi AI, Analisis RAB & Ekspor</b>
+                </div>
+                <p style="font-size: 0.82rem; color: #1e293b; margin: 0; line-height: 1.5;">
+                    Klik tombol analisis. Tinjau skor kondisi IKBG & RAB AHSP 2023, lalu unduh dokumen resmi (PDF, Excel) atau foto anotasi AI (.jpg).
+                </p>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
 
     col_left, col_right = st.columns([1, 1], gap="large")
 
@@ -3102,12 +3136,12 @@ if menu == "📊 Dashboard Utama & Input Data":
         if uploaded_file is None:
             st.warning("⚠️ Harap unggah foto kerusakan bangunan terlebih dahulu sebelum memulai analisis!")
         else:
-            with st.spinner("⏳ Menghubungi AI Agent Antigravity via HTTP POST JSON & Menghitung Estimasi AHSP Jateng..."):
+            with st.spinner("⏳ Menjalankan inferensi model YOLOv8 & Menghitung Estimasi AHSP Jateng 2023..."):
                 # Baca bytes gambar
                 img_bytes = uploaded_file.getvalue()
                 fname = uploaded_file.name
 
-                # Panggil AI Agent Antigravity
+                # Panggil Engine YOLOv8 & Civil AI
                 result_ai = AIAgentClient.call_agent(
                     image_bytes=img_bytes,
                     filename=fname,
