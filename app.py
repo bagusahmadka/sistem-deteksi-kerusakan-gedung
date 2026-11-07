@@ -3858,11 +3858,18 @@ elif menu == "📜 Riwayat Inspeksi Gedung":
                         st.error(f"ID #{delete_id} tidak ditemukan.")
 
         with col_mgt2:
-            # Kosongkan Database
-            if st.button("⚠️ Reset Seluruh Data", type="secondary", use_container_width=True):
-                DatabaseManager.clear_all()
-                st.warning("Seluruh riwayat berhasil dikosongkan.")
-                st.rerun()
+            # Kosongkan Database dengan Pengamanan Dua Langkah (Two-Step Safety Popover)
+            with st.popover("⚠️ Reset Database", use_container_width=True):
+                st.markdown("<b style='color:#dc2626; font-size:0.9rem;'>⚠️ Peringatan Keamanan Data</b>", unsafe_allow_html=True)
+                st.markdown("<p style='font-size:0.82rem; color:#1e293b; line-height:1.4;'>Tindakan ini akan mengosongkan <b>seluruh riwayat inspeksi gedung & RAB</b> secara permanen dari database SQLite.</p>", unsafe_allow_html=True)
+                confirm_txt = st.text_input("Ketik kata **HAPUS** untuk verifikasi:", value="", placeholder="HAPUS", key="input_confirm_reset")
+                if st.button("🔴 Konfirmasi Hapus Seluruh Data", type="primary", use_container_width=True, key="btn_confirm_reset"):
+                    if confirm_txt.strip().upper() == "HAPUS":
+                        DatabaseManager.clear_all()
+                        st.success("Seluruh riwayat berhasil dikosongkan.")
+                        st.rerun()
+                    else:
+                        st.error("Kata kunci verifikasi salah. Penghapusan dibatalkan demi keamanan data.")
 
         # -----------------------------------------------------------------------------------------
         # FITUR 5: PRATINJAU DOKUMEN LAPORAN LENGKAP PDF (IN-APP PDF VIEWER)
