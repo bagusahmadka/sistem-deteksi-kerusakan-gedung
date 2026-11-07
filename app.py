@@ -91,6 +91,19 @@ CUSTOM_CSS = """
         line-height: 1.6 !important;
     }
 
+    /* Pengecualian Kontras untuk Kontainer Latar Gelap (Hero Banner & Kartu IKBG Global) */
+    .hero-banner *,
+    .hero-banner h1, .hero-banner h2, .hero-banner h3, .hero-banner h4, .hero-banner p, .hero-banner div,
+    .ikbg-global-card,
+    .ikbg-global-card *,
+    .ikbg-global-card h1, .ikbg-global-card h2, .ikbg-global-card h3, .ikbg-global-card h4,
+    .ikbg-global-card p, .ikbg-global-card div, .ikbg-global-card span, .ikbg-global-card b {
+        color: #ffffff !important;
+    }
+    .ikbg-global-card p, .ikbg-global-card .subtext {
+        color: #e2e8f0 !important;
+    }
+
     /* Label Form & Input Streamlit */
     label,
     .stWidgetLabel,
@@ -3642,25 +3655,25 @@ elif menu == "📜 Riwayat Inspeksi Gedung":
         # PILIHAN C: KARTU EKSEKUTIF INDEKS KESEHATAN GEDUNG KUMULATIF (IKBG GLOBAL)
         # -----------------------------------------------------------------------------------------
         st.markdown(f"""
-        <div style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); border-radius: 16px; padding: 22px; color: #ffffff; box-shadow: 0 10px 25px rgba(15,23,42,0.25); border: 1px solid rgba(255,255,255,0.1); margin-bottom: 24px;">
+        <div class="ikbg-global-card" style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); border-radius: 16px; padding: 22px; color: #ffffff !important; box-shadow: 0 10px 25px rgba(15,23,42,0.25); border: 1px solid rgba(255,255,255,0.1); margin-bottom: 24px;">
             <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px;">
                 <div style="flex: 1; min-width: 280px;">
                     <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
-                        <span style="background: rgba(255,255,255,0.15); padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.5px;">EVALUASI KEANDALAN GLOBAL</span>
-                        <span style="background: {card_color}; color: #ffffff; padding: 4px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 800;">{status_gedung_badge}</span>
+                        <span style="background: rgba(255,255,255,0.15); color: #ffffff !important; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.5px;">EVALUASI KEANDALAN GLOBAL</span>
+                        <span style="background: {card_color}; color: #ffffff !important; padding: 4px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 800;">{status_gedung_badge}</span>
                     </div>
-                    <h3 style="margin: 0; font-size: 1.35rem; font-weight: 900; color: #f8fafc;">Indeks Kesehatan Gedung Kumulatif (IKBG Global)</h3>
-                    <p style="margin: 6px 0 14px 0; font-size: 0.92rem; color: #cbd5e1; line-height: 1.5;">
-                        Status: <b style="color: #ffffff;">{status_gedung_label}</b> (Berdasarkan evaluasi menyeluruh {len(records)} titik inspeksi sesuai Permen PUPR No. 24/PRT/M/2008).
-                    </p>
-                    <div style="background: rgba(255,255,255,0.07); border-left: 4px solid {card_color}; border-radius: 6px; padding: 10px 14px; font-size: 0.85rem; color: #e2e8f0; line-height: 1.5;">
-                        <b>Rekomendasi Manajerial:</b> {rekomendasi_manajerial}
+                    <div style="margin: 0; font-size: 1.35rem; font-weight: 900; color: #ffffff !important; letter-spacing: -0.3px;">Indeks Kesehatan Gedung Kumulatif (IKBG Global)</div>
+                    <div style="margin: 6px 0 14px 0; font-size: 0.92rem; color: #e2e8f0 !important; line-height: 1.5;">
+                        Status: <b style="color: #ffffff !important; font-weight: 800;">{status_gedung_label}</b> (Berdasarkan evaluasi menyeluruh {len(records)} titik inspeksi sesuai Permen PUPR No. 24/PRT/M/2008).
+                    </div>
+                    <div style="background: rgba(255,255,255,0.07); border-left: 4px solid {card_color}; border-radius: 6px; padding: 10px 14px; font-size: 0.85rem; color: #f1f5f9 !important; line-height: 1.5;">
+                        <b style="color: #ffffff !important;">Rekomendasi Manajerial:</b> {rekomendasi_manajerial}
                     </div>
                 </div>
                 <div style="text-align: center; background: rgba(255,255,255,0.06); border-radius: 14px; padding: 16px 24px; border: 1px solid rgba(255,255,255,0.1); min-width: 170px;">
-                    <div style="font-size: 0.78rem; text-transform: uppercase; color: #94a3b8; font-weight: 700; letter-spacing: 0.5px;">Rata-rata Skor (µ̄ku)</div>
-                    <div style="font-size: 2.6rem; font-weight: 900; color: #ffffff; line-height: 1.1; margin: 4px 0;">{avg_mu_ku}</div>
-                    <div style="font-size: 0.8rem; color: #cbd5e1; font-weight: 600;">Skala 0 - 100</div>
+                    <div style="font-size: 0.78rem; text-transform: uppercase; color: #cbd5e1 !important; font-weight: 700; letter-spacing: 0.5px;">Rata-rata Skor (µ̄ku)</div>
+                    <div style="font-size: 2.6rem; font-weight: 900; color: #ffffff !important; line-height: 1.1; margin: 4px 0;">{avg_mu_ku}</div>
+                    <div style="font-size: 0.8rem; color: #cbd5e1 !important; font-weight: 600;">Skala 0 - 100</div>
                     <div style="margin-top: 8px; width: 100%; background: rgba(255,255,255,0.2); height: 6px; border-radius: 3px; overflow: hidden;">
                         <div style="width: {min(100.0, avg_mu_ku)}%; background: {card_color}; height: 100%; border-radius: 3px;"></div>
                     </div>
