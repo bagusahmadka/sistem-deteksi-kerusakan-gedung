@@ -2,8 +2,7 @@
 ====================================================================================================
 SISTEM INFORMASI PEMELIHARAAN BANGUNAN GEDUNG MENYELURUH BERBASIS AI
 (Deteksi Kerusakan & Estimasi AHSP Jawa Tengah)
-Aplikasi Website Skripsi Teknik Sipil Digital
-Framework: Streamlit | AI Model: YOLOv8 Computer Vision | Database: SQLite3 | Ekspor: ReportLab
+Framework: Streamlit | AI Model: YOLOv8 Computer Vision | Database: SQLite3 | Ekspor: ReportLab PDF
 ====================================================================================================
 """
 
@@ -13,21 +12,13 @@ import json
 import base64
 import sqlite3
 import requests
-from datetime import datetime
+from datetime import datetime, date
 from typing import Dict, Any, List, Optional
 
 import streamlit as st
 import pandas as pd
 import altair as alt
 from PIL import Image, ImageDraw, ImageFont
-
-# Library OpenPyXL untuk ekspor formulir penilaian kondisi & tabel Excel
-import openpyxl
-from openpyxl.styles import (
-    Font as XlsFont, PatternFill as XlsPatternFill, Alignment as XlsAlignment,
-    Border as XlsBorder, Side as XlsSide
-)
-from openpyxl.utils import get_column_letter
 
 # Library ReportLab untuk cetak dokumen laporan resmi PDF
 from reportlab.lib.pagesizes import A4
@@ -526,52 +517,51 @@ CUSTOM_CSS = """
     }
 
     /* ========================================================================== */
-    /* 7. PROSEDUR METODE KERJA / STEPS                                           */
+    /* 7. PROSEDUR METODE KERJA / STEPS (TAMPILAN KARTU TAHAPAN MODERN)           */
     /* ========================================================================== */
-    .step-item {
-        display: flex;
-        margin-bottom: 12px;
-        align-items: flex-start;
-        padding: 14px 18px;
-        border-radius: 14px;
-        transition: all 0.28s cubic-bezier(0.16, 1, 0.3, 1);
-        background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+    .repair-steps-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 14px;
+        margin-top: 10px;
+        margin-bottom: 14px;
+    }
+    .repair-step-card {
+        background: linear-gradient(160deg, #ffffff 0%, #f8fafc 100%);
         border: 1.5px solid #cbd5e1;
-        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
-    }
-    .step-item:hover {
-        background: #ffffff;
-        transform: translateX(6px);
-        border-color: #2563eb;
-        box-shadow: 0 8px 20px -4px rgba(37, 99, 235, 0.16);
-    }
-
-    .step-number {
-        background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%) !important;
-        color: #ffffff !important;
-        border-radius: 50%;
-        width: 32px;
-        height: 32px;
+        border-top: 4px solid #2563eb;
+        border-radius: 14px;
+        padding: 16px 16px 14px 16px;
+        box-shadow: 0 3px 10px rgba(15, 23, 42, 0.05);
+        transition: all 0.25s ease;
         display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+    .repair-step-card:hover {
+        transform: translateY(-3px);
+        border-color: #2563eb;
+        box-shadow: 0 10px 22px -6px rgba(37, 99, 235, 0.22);
+    }
+    .repair-step-badge {
+        display: inline-flex;
         align-items: center;
-        justify-content: center;
-        font-size: 0.85rem;
-        font-weight: 900;
-        margin-right: 14px;
-        flex-shrink: 0;
-        box-shadow: 0 4px 10px rgba(37, 99, 235, 0.4);
-        transition: transform 0.25s ease;
+        gap: 6px;
+        background: #eff6ff;
+        color: #1d4ed8;
+        border: 1px solid #bfdbfe;
+        border-radius: 999px;
+        padding: 3px 10px;
+        font-size: 0.74rem;
+        font-weight: 800;
+        width: fit-content;
+        letter-spacing: 0.4px;
     }
-
-    .step-item:hover .step-number {
-        transform: scale(1.1) rotate(5deg);
-    }
-
-    .step-text {
-        font-size: 0.95rem !important;
+    .repair-step-body {
+        font-size: 0.9rem !important;
         font-weight: 600 !important;
         color: #0f172a !important;
-        line-height: 1.6 !important;
+        line-height: 1.55 !important;
     }
 
     /* ========================================================================== */
@@ -806,19 +796,48 @@ CUSTOM_CSS = """
         background-color: #ffffff !important;
     }
 
-    /* File Uploader Visual */
+    /* File Uploader Visual Besar dengan Ikon Kamera */
     div[data-testid="stFileUploader"] {
-        background: #ffffff;
-        border: 2px dashed #93c5fd;
-        border-radius: 16px;
-        padding: 16px;
+        background: linear-gradient(180deg, #f8fbff 0%, #eff6ff 100%);
+        border: 2.5px dashed #2563eb;
+        border-radius: 18px;
+        padding: 22px 20px;
         transition: all 0.3s ease;
-        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
+        box-shadow: 0 4px 14px rgba(37, 99, 235, 0.08);
     }
     div[data-testid="stFileUploader"]:hover {
-        border-color: #2563eb;
-        background: #eff6ff;
-        box-shadow: 0 8px 20px rgba(37, 99, 235, 0.15);
+        border-color: #1d4ed8;
+        background: #e0ecff;
+        box-shadow: 0 10px 24px rgba(37, 99, 235, 0.16);
+    }
+    div[data-testid="stFileUploaderDropzone"] {
+        min-height: 165px !important;
+        padding: 24px 16px !important;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        justify-content: center !important;
+        text-align: center !important;
+    }
+    .camera-upload-hero {
+        background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+        border: 2px solid #93c5fd;
+        border-radius: 16px;
+        padding: 18px 16px 12px 16px;
+        text-align: center;
+        margin-bottom: 10px;
+    }
+    .camera-upload-caption {
+        text-align: center;
+        font-size: 0.9rem;
+        font-weight: 700;
+        color: #b91c1c;
+        background: #fef2f2;
+        border: 1px solid #fecaca;
+        border-radius: 10px;
+        padding: 8px 12px;
+        margin-top: 8px;
+        margin-bottom: 14px;
     }
 
     /* Custom Slim Scrollbars */
@@ -984,7 +1003,15 @@ class DatabaseManager:
             if "lokasi_lantai" not in cols:
                 cursor.execute("ALTER TABLE riwayat_kerusakan ADD COLUMN lokasi_lantai TEXT DEFAULT '-'")
             if "surveyor" not in cols:
-                cursor.execute("ALTER TABLE riwayat_kerusakan ADD COLUMN surveyor TEXT DEFAULT 'Surveyor Lapangan'")
+                cursor.execute("ALTER TABLE riwayat_kerusakan ADD COLUMN surveyor TEXT DEFAULT 'Inspektor Lapangan'")
+            if "koordinat_lokasi" not in cols:
+                cursor.execute("ALTER TABLE riwayat_kerusakan ADD COLUMN koordinat_lokasi TEXT DEFAULT '-'")
+            if "objek_inspeksi" not in cols:
+                cursor.execute("ALTER TABLE riwayat_kerusakan ADD COLUMN objek_inspeksi TEXT DEFAULT 'Arsitektur'")
+            if "luas_total" not in cols:
+                cursor.execute("ALTER TABLE riwayat_kerusakan ADD COLUMN luas_total REAL DEFAULT 25.0")
+            if "persentase_kerusakan" not in cols:
+                cursor.execute("ALTER TABLE riwayat_kerusakan ADD COLUMN persentase_kerusakan REAL DEFAULT 10.0")
             conn.commit()
 
     @classmethod
@@ -1001,7 +1028,11 @@ class DatabaseManager:
         rekomendasi: str,
         nama_gedung: str = "Bangunan Gedung",
         lokasi_lantai: str = "-",
-        surveyor: str = "Surveyor Lapangan"
+        surveyor: str = "Inspektor Lapangan",
+        koordinat_lokasi: str = "-",
+        objek_inspeksi: str = "Arsitektur",
+        luas_total: float = 25.0,
+        persentase_kerusakan: float = 10.0
     ) -> int:
         """Menyimpan data penilaian kondisi kerusakan gedung ke SQLite."""
         with cls.get_connection() as conn:
@@ -1009,13 +1040,17 @@ class DatabaseManager:
             cursor.execute("""
                 INSERT INTO riwayat_kerusakan (
                     tanggal, nama_gedung, lokasi_lantai, surveyor,
+                    koordinat_lokasi, objek_inspeksi,
                     elemen_gedung, jenis_kerusakan, kode_ahsp,
-                    volume, satuan, harga_satuan, total_biaya, rekomendasi
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    volume, satuan, harga_satuan, total_biaya, rekomendasi,
+                    luas_total, persentase_kerusakan
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 tanggal, nama_gedung, lokasi_lantai, surveyor,
+                koordinat_lokasi, objek_inspeksi,
                 elemen_gedung, jenis_kerusakan, kode_ahsp,
-                volume, satuan, int(harga_satuan), int(total_biaya), rekomendasi
+                volume, satuan, int(harga_satuan), int(total_biaya), rekomendasi,
+                float(luas_total), float(persentase_kerusakan)
             ))
             conn.commit()
             return cursor.lastrowid
@@ -1048,31 +1083,39 @@ class DatabaseManager:
 
     @classmethod
     def seed_initial_demo_data(cls) -> None:
-        """Menambahkan data sampel realistis untuk demonstrasi sidang skripsi."""
+        """Menambahkan data sampel realistis untuk demonstrasi pengujian sistem."""
         samples = [
             (
                 "2026-11-01 09:30", "Gedung Kuliah Terpadu", "Lantai 2 - Selasar Barat", "Ahmad Fajar, S.T.",
+                "-7.005100, 110.438100", "Struktur - Balok Beton Bertulang",
                 "Balok Beton Bertulang", "Retak Diagonal Geser/Lentur Balok", "A.4.1.1.18.JT",
-                4.5, "m'", 315000, 1417500,
-                "Injeksi resin epoxy bertekanan rendah pada balok lantai 2 as C-4 untuk mengembalikan monolititas beton."
+                4.5, "m'", 294860, 1326870,
+                "Injeksi resin epoxy bertekanan rendah pada balok lantai 2 as C-4 untuk mengembalikan monolititas beton.",
+                18.0, 25.0
             ),
             (
                 "2026-11-02 11:15", "Gedung Kuliah Terpadu", "Lantai 1 - Ruang 103", "Ahmad Fajar, S.T.",
-                "Dinding Pasangan Bata / Hebel", "Retak Rambut Plesteran (> 0.20 mm)", "A.4.4.1.25.JT",
-                14.0, "m2", 88500, 1239000,
-                "Pembobokan alur retak bentuk V, aplikasi elastomeric sealant, plamir polimer dan pengecatan ulang."
+                "-7.005100, 110.438100", "Arsitektur - Dinding dan Partisi",
+                "Dinding dan Partisi", "Retak Rambut", "A.4.4.1.25.JT",
+                3.0, "m2", 95163, 285489,
+                "Pembersihan alur retak bentuk V, aplikasi elastomeric sealant, acian polimer dan pengecatan ulang.",
+                32.0, 9.4
             ),
             (
-                "2026-11-03 14:00", "Gedung Kuliah Terpadu", "Lantai Atap - Plat Dak", "Ahmad Fajar, S.T.",
-                "Pelat Lantai / Dak Beton", "Rembesan Air & Retak Rambut Dak Atap", "A.4.4.3.35.JT",
-                25.0, "m2", 175000, 4375000,
-                "Pembersihan substrat, injeksi waterproofing kristalisasi, pelapisan membrane polyurethane 2 lapis."
+                "2026-11-03 14:00", "Gedung Kuliah Terpadu", "Lantai 1 - Ruang 105", "Ahmad Fajar, S.T.",
+                "-7.005100, 110.438100", "Arsitektur - Lantai",
+                "Lantai", "Pecah (1 Keramik 60x60)", "A.4.4.3.02.JT",
+                0.36, "m2", 268180, 96545,
+                "Pembongkaran 1 keping keramik pecah secara hati-hati dengan gerinda nat agar tidak merusak keramik sebelahnya, lalu pasang ulang dengan mortar perekat.",
+                20.0, 1.8
             ),
             (
                 "2026-11-04 10:45", "Gedung Kuliah Terpadu", "Lantai Dasar - Kolom K-02", "Ahmad Fajar, S.T.",
+                "-7.005100, 110.438100", "Struktur - Kolom Struktur Beton",
                 "Kolom Struktur Beton", "Spalling / Beton Terkelupas & Tulangan Terbuka", "A.4.1.1.20.JT",
-                3.2, "m2", 245000, 784000,
-                "Chipping beton rapuh, pembersihan karat tulangan baja, pelapisan zinc-rich primer, dan patching polymer mortar."
+                3.2, "m2", 293135, 938032,
+                "Chipping beton rapuh, pembersihan karat tulangan baja, pelapisan zinc-rich primer, dan patching polymer mortar.",
+                8.0, 40.0
             )
         ]
         with cls.get_connection() as conn:
@@ -1081,9 +1124,11 @@ class DatabaseManager:
                 cursor.execute("""
                     INSERT INTO riwayat_kerusakan (
                         tanggal, nama_gedung, lokasi_lantai, surveyor,
+                        koordinat_lokasi, objek_inspeksi,
                         elemen_gedung, jenis_kerusakan, kode_ahsp,
-                        volume, satuan, harga_satuan, total_biaya, rekomendasi
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        volume, satuan, harga_satuan, total_biaya, rekomendasi,
+                        luas_total, persentase_kerusakan
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, s)
             conn.commit()
 
@@ -1092,244 +1137,993 @@ DatabaseManager.init_db()
 
 
 # ==================================================================================================
-# 3. BASIS DATA & PENGETAHUAN TEKNIK SIPIL: AHSP JAWA TENGAH TAHUN 2023
+# 3. BASIS DATA & PENGETAHUAN TEKNIK SIPIL: AHSP JAWA TENGAH TAHUN 2023 (RINCI PER BAHAN & UPAH)
 # ==================================================================================================
+def _make_ahsp(
+    kode: str,
+    bidang: str,
+    kategori: str,
+    elemen_terkait: str,
+    sub_kerusakan: str,
+    nama: str,
+    satuan: str,
+    tingkat_keparahan: str,
+    bobot_fisik: float,
+    bobot_fungsi: float,
+    is_struktural: bool,
+    upah: List[Dict[str, Any]],
+    bahan: List[Dict[str, Any]],
+    langkah_kerja: List[str],
+    rekomendasi: str
+) -> Dict[str, Any]:
+    """Menyusun item AHSP terstandar dengan kalkulasi HSP otomatis dari rincian upah + bahan + overhead 15%."""
+    subtotal_upah = sum(float(u["koef"]) * float(u["harga_satuan"]) for u in upah)
+    subtotal_bahan = sum(float(b["koef"]) * float(b["harga_satuan"]) for b in bahan)
+    dasar = subtotal_upah + subtotal_bahan
+    overhead = dasar * 0.15
+    hsp = int(round(dasar + overhead))
+    return {
+        "kode": kode,
+        "bidang": bidang,
+        "kategori": kategori,
+        "elemen_terkait": elemen_terkait,
+        "sub_kerusakan": sub_kerusakan,
+        "nama": nama,
+        "satuan": satuan,
+        "harga_satuan": hsp,
+        "subtotal_upah": int(round(subtotal_upah)),
+        "subtotal_bahan": int(round(subtotal_bahan)),
+        "overhead_15": int(round(overhead)),
+        "jenis_kerusakan": f"{sub_kerusakan} pada {elemen_terkait}",
+        "tingkat_keparahan": tingkat_keparahan,
+        "bobot_fisik": bobot_fisik,
+        "bobot_fungsi": bobot_fungsi,
+        "is_struktural": is_struktural,
+        "koefisien_upah": upah,
+        "koefisien_bahan": bahan,
+        "langkah_kerja": langkah_kerja,
+        "rekomendasi": rekomendasi,
+    }
+
+
+UPAH_JATENG = {
+    "Pekerja": 110000,
+    "Tukang": 135000,
+    "Tukang_Ahli": 145000,
+    "Kepala_Tukang": 155000,
+    "Mandor": 165000,
+}
+
+
 class AHSPKnowledgeBase:
     """Katalog Standar Analisis Harga Satuan Pekerjaan (AHSP) Dinas PU Bina Marga & Cipta Karya Jateng 2023."""
 
+    OBJEK_INSPEKSI_MAP = {
+        "Arsitektur - Dinding dan Partisi": [
+            "Retak rambut",
+            "Pengelupasan cat",
+            "Cat menggelembung",
+            "Jamur",
+        ],
+        "Arsitektur - Plafon": [
+            "Kebocoran",
+            "Jamur",
+            "Retak",
+            "Rusak",
+        ],
+        "Arsitektur - Pintu dan Jendela": [
+            "Kotor",
+            "Pelapukan",
+            "Karat",
+            "Kaca retak",
+            "Sealent",
+        ],
+        "Arsitektur - Lantai": [
+            "Pecah",
+            "Retak",
+            "Kotor",
+            "Berjamur",
+            "Popping",
+            "Gumpil",
+        ],
+        "Arsitektur - Atap": [
+            "Bocor",
+            "Pecah",
+            "Karat",
+            "Kotor",
+            "Jamur",
+        ],
+        "Struktur - Balok Beton Bertulang": [
+            "Retak Struktur (Crack)",
+            "Spalling / Keropos",
+            "Tulangan Terbuka (Exposed Rebar)",
+        ],
+        "Struktur - Kolom Struktur Beton": [
+            "Spalling / Keropos",
+            "Retak Struktur (Crack)",
+            "Tulangan Terbuka (Exposed Rebar)",
+        ],
+        "Struktur - Pelat Lantai / Dak Beton": [
+            "Rembesan / Bocor & Efflorescence",
+            "Retak Pelat Beton",
+            "Spalling Bawah Pelat",
+        ],
+    }
+
     CATALOG = {
-        "A.4.4.1.25.JT": {
-            "kode": "A.4.4.1.25.JT",
-            "kategori": "Pekerjaan Dinding & Finishing",
-            "nama": "Perbaikan Retak Plesteran Mortar Polimer & Sealant Elastomeric",
-            "satuan": "m2",
-            "harga_satuan": 88500,
-            "elemen_terkait": "Dinding Pasangan Bata / Hebel",
-            "jenis_kerusakan": "Retak Rambut Plesteran (> 0.20 mm)",
-            "tingkat_keparahan": "Sedang",
-            "koefisien_upah": [
-                {"tenaga": "Pekerja", "koef": 0.120, "satuan": "OH"},
-                {"tenaga": "Tukang Batu/Cat", "koef": 0.150, "satuan": "OH"},
-                {"tenaga": "Kepala Tukang", "koef": 0.015, "satuan": "OH"},
-                {"tenaga": "Mandor", "koef": 0.008, "satuan": "OH"}
+        # ARSITEKTUR 1: DINDING DAN PARTISI
+        "A.4.4.1.25.JT": _make_ahsp(
+            kode="A.4.4.1.25.JT",
+            bidang="Arsitektur",
+            kategori="Arsitektur - Dinding dan Partisi",
+            elemen_terkait="Dinding dan Partisi",
+            sub_kerusakan="Retak rambut",
+            nama="Perbaikan Retak Rambut Dinding dengan Mortar Polimer & Acian Elastis",
+            satuan="m2",
+            tingkat_keparahan="Ringan",
+            bobot_fisik=0.70,
+            bobot_fungsi=0.35,
+            is_struktural=False,
+            upah=[
+                {"tenaga": "Pekerja", "koef": 0.120, "satuan": "OH", "harga_satuan": UPAH_JATENG["Pekerja"]},
+                {"tenaga": "Tukang Batu/Cat", "koef": 0.150, "satuan": "OH", "harga_satuan": UPAH_JATENG["Tukang"]},
+                {"tenaga": "Kepala Tukang", "koef": 0.015, "satuan": "OH", "harga_satuan": UPAH_JATENG["Kepala_Tukang"]},
+                {"tenaga": "Mandor", "koef": 0.008, "satuan": "OH", "harga_satuan": UPAH_JATENG["Mandor"]},
             ],
-            "koefisien_bahan": [
-                {"bahan": "Polymer Modified Mortar", "koef": 1.250, "satuan": "kg"},
-                {"bahan": "Sealant Elastomeric Polyurethane", "koef": 0.400, "satuan": "tube"},
-                {"bahan": "Bonding Agent Adhesive", "koef": 0.150, "satuan": "liter"}
+            bahan=[
+                {"bahan": "Polymer Modified Mortar / Filler Elastis", "koef": 1.250, "satuan": "kg", "harga_satuan": 16500},
+                {"bahan": "Sealant Elastomeric Polyurethane", "koef": 0.350, "satuan": "tube", "harga_satuan": 55000},
+                {"bahan": "Bonding Agent Adhesive", "koef": 0.150, "satuan": "liter", "harga_satuan": 48000},
+                {"bahan": "Cat Dasar & Finishing Tembok", "koef": 0.250, "satuan": "kg", "harga_satuan": 36000},
             ],
-            "langkah_kerja": [
-                "Pembersihan celah retakan dari debu dan partikel lepas menggunakan sikat kawat dan kompresor udara.",
-                "Pelebaran alur celah retak membentuk pola V-groove selebar 5 mm dan kedalaman 5-10 mm.",
-                "Aplikasi cairan primer / bonding agent sintetis pada alur celah retak.",
-                "Pengisian pasta polymer modified mortar dan elastomeric sealant ke dalam alur retak secara padat rata.",
-                "Penghalusan plamir acian elastis dan pengecatan ulang 2 lapis sesuai warna eksisting."
+            langkah_kerja=[
+                "Bersihkan celah retak rambut dinding dari debu dan plesteran rapuh menggunakan sikat kawat dan kuas bersih.",
+                "Buka alur celah retak membentuk alur huruf V (V-groove) selebar 3-5 mm memakai pahat atau scraper.",
+                "Oleskan cairan bonding agent pada alur retak sebagai lapis pengikat material baru.",
+                "Isi dan rapatkan celah menggunakan mortar polimer / filler elastis hingga rata dengan bidang dinding eksisting.",
+                "Amplas halus permukaan setelah kering, lalu lapisi cat dasar dan cat finishing 2 lapis sesuai warna awal."
             ],
-            "rekomendasi": "Pasang crack monitoring card untuk mengevaluasi apakah retakan bersifat statis atau masih bergerak akibat penurunan tanah fondasi."
-        },
-        "A.4.1.1.18.JT": {
-            "kode": "A.4.1.1.18.JT",
-            "kategori": "Pekerjaan Struktur Beton",
-            "nama": "Perbaikan Retak Balok/Kolom dengan Injeksi Epoxy Resin Bertekanan",
-            "satuan": "m'",
-            "harga_satuan": 315000,
-            "elemen_terkait": "Balok Beton Bertulang",
-            "jenis_kerusakan": "Retak Diagonal Lentur/Geser Balok Struktur",
-            "tingkat_keparahan": "Berat",
-            "koefisien_upah": [
-                {"tenaga": "Pekerja", "koef": 0.200, "satuan": "OH"},
-                {"tenaga": "Tukang Khusus Injeksi", "koef": 0.250, "satuan": "OH"},
-                {"tenaga": "Kepala Tukang", "koef": 0.025, "satuan": "OH"},
-                {"tenaga": "Mandor", "koef": 0.012, "satuan": "OH"}
+            rekomendasi="Pantau area retakan secara berkala jika muncul berulang untuk memastikan bukan retak geser akibat penurunan tanah fondasi."
+        ),
+        "A.4.7.1.04.JT": _make_ahsp(
+            kode="A.4.7.1.04.JT",
+            bidang="Arsitektur",
+            kategori="Arsitektur - Dinding dan Partisi",
+            elemen_terkait="Dinding dan Partisi",
+            sub_kerusakan="Pengelupasan cat",
+            nama="Pengerokan Cat Mengelupas, Plamir Akrilik & Pengecatan Ulang Dinding 2 Lapis",
+            satuan="m2",
+            tingkat_keparahan="Ringan",
+            bobot_fisik=0.55,
+            bobot_fungsi=0.25,
+            is_struktural=False,
+            upah=[
+                {"tenaga": "Pekerja", "koef": 0.070, "satuan": "OH", "harga_satuan": UPAH_JATENG["Pekerja"]},
+                {"tenaga": "Tukang Cat", "koef": 0.090, "satuan": "OH", "harga_satuan": UPAH_JATENG["Tukang"]},
+                {"tenaga": "Kepala Tukang", "koef": 0.009, "satuan": "OH", "harga_satuan": UPAH_JATENG["Kepala_Tukang"]},
+                {"tenaga": "Mandor", "koef": 0.004, "satuan": "OH", "harga_satuan": UPAH_JATENG["Mandor"]},
             ],
-            "koefisien_bahan": [
-                {"bahan": "Low Viscosity Epoxy Resin", "koef": 0.850, "satuan": "kg"},
-                {"bahan": "Epoxy Surface Sealant Paste", "koef": 0.500, "satuan": "kg"},
-                {"bahan": "Injection Port / Nipple", "koef": 5.000, "satuan": "buah"}
+            bahan=[
+                {"bahan": "Alkali-Resisting Primer Sealer", "koef": 0.140, "satuan": "liter", "harga_satuan": 62000},
+                {"bahan": "Plamir Tembok Acrylic", "koef": 0.150, "satuan": "kg", "harga_satuan": 22000},
+                {"bahan": "Cat Tembok Akrilik Bermutu", "koef": 0.300, "satuan": "kg", "harga_satuan": 42000},
+                {"bahan": "Kertas Amplas & Kape Scrap", "koef": 0.250, "satuan": "lbr", "harga_satuan": 6000},
             ],
-            "langkah_kerja": [
+            langkah_kerja=[
+                "Kerok seluruh lapisan cat lama yang mengelupas dan rapuh memakai kape besi sampai mencapai lapisan acian yang padat.",
+                "Amplas permukaan dinding agar pori terbuka dan bersihkan sisa serbuk kapur dengan lap lembab.",
+                "Lapisi 1 lapis Alkali-Resisting Primer Sealer untuk menstabilkan pH acian dinding dan memperkuat daya rekat cat.",
+                "Tutup bagian dinding yang tidak rata dengan plamir akrilik tipis, lalu amplas rata setelah kering.",
+                "Aplikasikan cat tembok akrilik 2 lapis secara menyilang dengan jeda waktu pengeringan minimal 2 jam antar lapis."
+            ],
+            rekomendasi="Pastikan kelembapan dinding < 16% sebelum pengecatan ulang agar cat baru tidak kembali terkelupas."
+        ),
+        "A.4.7.1.06.JT": _make_ahsp(
+            kode="A.4.7.1.06.JT",
+            bidang="Arsitektur",
+            kategori="Arsitektur - Dinding dan Partisi",
+            elemen_terkait="Dinding dan Partisi",
+            sub_kerusakan="Cat menggelembung",
+            nama="Perbaikan Cat Menggelembung (Blistering) dengan Sealer Anti Lembab",
+            satuan="m2",
+            tingkat_keparahan="Ringan",
+            bobot_fisik=0.65,
+            bobot_fungsi=0.35,
+            is_struktural=False,
+            upah=[
+                {"tenaga": "Pekerja", "koef": 0.090, "satuan": "OH", "harga_satuan": UPAH_JATENG["Pekerja"]},
+                {"tenaga": "Tukang Cat", "koef": 0.110, "satuan": "OH", "harga_satuan": UPAH_JATENG["Tukang"]},
+                {"tenaga": "Kepala Tukang", "koef": 0.011, "satuan": "OH", "harga_satuan": UPAH_JATENG["Kepala_Tukang"]},
+                {"tenaga": "Mandor", "koef": 0.005, "satuan": "OH", "harga_satuan": UPAH_JATENG["Mandor"]},
+            ],
+            bahan=[
+                {"bahan": "Cat Dasar Anti Lembab / Damp Sealer", "koef": 0.200, "satuan": "kg", "harga_satuan": 78000},
+                {"bahan": "Mortar Acian Tahan Lembab", "koef": 0.500, "satuan": "kg", "harga_satuan": 12000},
+                {"bahan": "Cat Dinding Breathable Acrylic", "koef": 0.300, "satuan": "kg", "harga_satuan": 48000},
+                {"bahan": "Kertas Amplas Halus Grid 180", "koef": 0.300, "satuan": "lbr", "harga_satuan": 6000},
+            ],
+            langkah_kerja=[
+                "Kupas dan kerok area gelembung cat secara menyeluruh hingga tidak ada gelembung udara atau kantong uap air tersisa.",
+                "Periksa dan hentikan sumber rembesan air (pipa bocor, talang, atau kapilaritas dinding luar).",
+                "Biarkan dinding mengering sempurna (24-48 jam) sebelum pelapisan dasar dilakukan.",
+                "Oleskan 1-2 lapis cat dasar damp-proof sealer sebagai penghalang uap air dan garam alkali.",
+                "Ratakan dengan acian tipis jika perlu, lalu cat ulang 2 lapis menggunakan cat tembok tipe breathable."
+            ],
+            rekomendasi="Jika gelembung berada di dinding bawah dekat lantai, periksa lapisan trasraam / sumber rembesan air tanah."
+        ),
+        "A.4.7.1.08.JT": _make_ahsp(
+            kode="A.4.7.1.08.JT",
+            bidang="Arsitektur",
+            kategori="Arsitektur - Dinding dan Partisi",
+            elemen_terkait="Dinding dan Partisi",
+            sub_kerusakan="Jamur",
+            nama="Pembersihan Jamur Dinding, Fungicidal Wash & Pengecatan Anti Jamur",
+            satuan="m2",
+            tingkat_keparahan="Ringan",
+            bobot_fisik=0.50,
+            bobot_fungsi=0.30,
+            is_struktural=False,
+            upah=[
+                {"tenaga": "Pekerja", "koef": 0.080, "satuan": "OH", "harga_satuan": UPAH_JATENG["Pekerja"]},
+                {"tenaga": "Tukang Cat", "koef": 0.095, "satuan": "OH", "harga_satuan": UPAH_JATENG["Tukang"]},
+                {"tenaga": "Kepala Tukang", "koef": 0.010, "satuan": "OH", "harga_satuan": UPAH_JATENG["Kepala_Tukang"]},
+                {"tenaga": "Mandor", "koef": 0.004, "satuan": "OH", "harga_satuan": UPAH_JATENG["Mandor"]},
+            ],
+            bahan=[
+                {"bahan": "Cairan Fungicidal Wash Anti Jamur", "koef": 0.250, "satuan": "liter", "harga_satuan": 52000},
+                {"bahan": "Alkali-Resisting Sealer Primer", "koef": 0.120, "satuan": "liter", "harga_satuan": 62000},
+                {"bahan": "Cat Tembok Anti-Fungal / Anti Jamur", "koef": 0.300, "satuan": "kg", "harga_satuan": 54000},
+            ],
+            langkah_kerja=[
+                "Sikat dan bersihkan koloni jamur serta lumut secara kering/lembab menggunakan sikat nilon kaku.",
+                "Semprotkan atau kuaskan larutan fungicidal wash merata ke seluruh area berjamur hingga jarak 30 cm di sekitarnya, diamkan 24 jam.",
+                "Bilas dengan air bersih, lalu keringkan permukaan dinding hingga benar-benar kering.",
+                "Aplikasikan 1 lapis primer sealer penahan alkali untuk menutup pori-pori permukaan.",
+                "Cat ulang sebanyak 2 lapis menggunakan cat tembok berformulasi anti jamur dan anti lumut."
+            ],
+            rekomendasi="Tingkatkan sirkulasi udara / ventilasi ruangan atau pasang exhaust fan pada ruangan lembab untuk mencegah pertumbuhan spora ulang."
+        ),
+
+        # ARSITEKTUR 2: PLAFON
+        "A.4.5.1.12.JT": _make_ahsp(
+            kode="A.4.5.1.12.JT",
+            bidang="Arsitektur",
+            kategori="Arsitektur - Plafon",
+            elemen_terkait="Plafon",
+            sub_kerusakan="Kebocoran",
+            nama="Perbaikan Plafon Terdampak Kebocoran, Water-Stain Sealer & Penggantian Panel",
+            satuan="m2",
+            tingkat_keparahan="Sedang",
+            bobot_fisik=0.85,
+            bobot_fungsi=0.70,
+            is_struktural=False,
+            upah=[
+                {"tenaga": "Pekerja", "koef": 0.120, "satuan": "OH", "harga_satuan": UPAH_JATENG["Pekerja"]},
+                {"tenaga": "Tukang Plafon", "koef": 0.140, "satuan": "OH", "harga_satuan": UPAH_JATENG["Tukang"]},
+                {"tenaga": "Kepala Tukang", "koef": 0.014, "satuan": "OH", "harga_satuan": UPAH_JATENG["Kepala_Tukang"]},
+                {"tenaga": "Mandor", "koef": 0.006, "satuan": "OH", "harga_satuan": UPAH_JATENG["Mandor"]},
+            ],
+            bahan=[
+                {"bahan": "Panel Plafon Moisture-Resistant 9 mm", "koef": 0.364, "satuan": "lbr", "harga_satuan": 108000},
+                {"bahan": "Sekrup Drywall Anti Karat", "koef": 16.000, "satuan": "buah", "harga_satuan": 300},
+                {"bahan": "Compound Joint & Stain-Blocking Primer", "koef": 0.350, "satuan": "kg", "harga_satuan": 45000},
+                {"bahan": "Cat Plafon Matte", "koef": 0.250, "satuan": "kg", "harga_satuan": 36000},
+            ],
+            langkah_kerja=[
+                "Bongkar bagian panel plafon yang basah, lembek, atau bernoda bocor untuk membuka akses pengecekan sumber air.",
+                "Perbaiki dan pastikan sumber kebocoran dari atap, dak beton, atau pipa utilitas di atas plafon telah tuntas kering.",
+                "Periksa kondisi rangka hollow penggantung dari korosi, perkuat atau ganti batang rangka yang berkarat.",
+                "Pasang panel plafon tahan lembab baru dengan sekrup drywall jarak tiap 20 cm.",
+                "Tutup nat sambungan dengan compound + paper tape, aplikasikan stain-blocker primer, dan cat ulang plafon 2 lapis."
+            ],
+            rekomendasi="Jangan memasang plafon baru sebelum sumber kebocoran di atas plafon dipastikan kering dan teruji tidak menetes lagi."
+        ),
+        "A.4.5.1.14.JT": _make_ahsp(
+            kode="A.4.5.1.14.JT",
+            bidang="Arsitektur",
+            kategori="Arsitektur - Plafon",
+            elemen_terkait="Plafon",
+            sub_kerusakan="Jamur",
+            nama="Pembersihan Plafon Berjamur, Fungicidal Treatment & Pengecatan Plafon",
+            satuan="m2",
+            tingkat_keparahan="Ringan",
+            bobot_fisik=0.55,
+            bobot_fungsi=0.35,
+            is_struktural=False,
+            upah=[
+                {"tenaga": "Pekerja", "koef": 0.080, "satuan": "OH", "harga_satuan": UPAH_JATENG["Pekerja"]},
+                {"tenaga": "Tukang Plafon/Cat", "koef": 0.100, "satuan": "OH", "harga_satuan": UPAH_JATENG["Tukang"]},
+                {"tenaga": "Kepala Tukang", "koef": 0.010, "satuan": "OH", "harga_satuan": UPAH_JATENG["Kepala_Tukang"]},
+                {"tenaga": "Mandor", "koef": 0.005, "satuan": "OH", "harga_satuan": UPAH_JATENG["Mandor"]},
+            ],
+            bahan=[
+                {"bahan": "Cairan Pembersih Jamur (Fungicidal)", "koef": 0.200, "satuan": "liter", "harga_satuan": 52000},
+                {"bahan": "Stain-Blocking Sealer Primer", "koef": 0.150, "satuan": "liter", "harga_satuan": 68000},
+                {"bahan": "Cat Plafon Anti Jamur", "koef": 0.280, "satuan": "kg", "harga_satuan": 48000},
+            ],
+            langkah_kerja=[
+                "Siapkan perancah (scaffolding) dan lindungi perabot lantai di bawah area kerja dengan plastik terpal.",
+                "Bersihkan bercak jamur pada permukaan plafon dengan kain lembab bercampur larutan fungisida.",
+                "Keringkan permukaan plafon secara alami dengan ventilasi terbuka.",
+                "Lapisi 1 lapis stain-blocking primer untuk mencegah noda kuning dan spora jamur menembus cat baru.",
+                "Cat ulang permukaan plafon 2 lapis memakai cat plafon anti jamur."
+            ],
+            rekomendasi="Periksa apakah plafon memiliki kondensasi dari ducting AC atau kelembapan ruang atap yang kurang berventilasi."
+        ),
+        "A.4.5.1.16.JT": _make_ahsp(
+            kode="A.4.5.1.16.JT",
+            bidang="Arsitektur",
+            kategori="Arsitektur - Plafon",
+            elemen_terkait="Plafon",
+            sub_kerusakan="Retak",
+            nama="Perbaikan Retak Sambungan Plafon dengan Textile Tape & Compound",
+            satuan="m2",
+            tingkat_keparahan="Ringan",
+            bobot_fisik=0.65,
+            bobot_fungsi=0.40,
+            is_struktural=False,
+            upah=[
+                {"tenaga": "Pekerja", "koef": 0.080, "satuan": "OH", "harga_satuan": UPAH_JATENG["Pekerja"]},
+                {"tenaga": "Tukang Plafon", "koef": 0.110, "satuan": "OH", "harga_satuan": UPAH_JATENG["Tukang"]},
+                {"tenaga": "Kepala Tukang", "koef": 0.011, "satuan": "OH", "harga_satuan": UPAH_JATENG["Kepala_Tukang"]},
+                {"tenaga": "Mandor", "koef": 0.004, "satuan": "OH", "harga_satuan": UPAH_JATENG["Mandor"]},
+            ],
+            bahan=[
+                {"bahan": "Gypsum Joint Compound (Tepung Kompon)", "koef": 0.650, "satuan": "kg", "harga_satuan": 16000},
+                {"bahan": "Fiberglass Mesh / Cotton Tape", "koef": 1.200, "satuan": "m'", "harga_satuan": 3500},
+                {"bahan": "Sekrup Drywall Tambahan", "koef": 10.000, "satuan": "buah", "harga_satuan": 300},
+                {"bahan": "Cat Plafon Matte", "koef": 0.250, "satuan": "kg", "harga_satuan": 36000},
+            ],
+            langkah_kerja=[
+                "Buka alur retakan sambungan plafon berbentuk V dan bersihkan sisa kompon lama yang terlepas.",
+                "Tambahkan sekrup drywall di sisi kiri-kanan sambungan bila panel terasa goyang pada rangka hollow.",
+                "Tempelkan fiberglass mesh tape atau paper tape tepat di atas alur retakan.",
+                "Aplikasikan kompon gypsum 2-3 lapis bertahap (tipis lalu melebar) hingga sambungan rata sempurna.",
+                "Amplas halus dengan grid 180-220 setelah kering, lalu cat ulang plafon agar warna seragam."
+            ],
+            rekomendasi="Gunakan compound elastis berdaya rekat tinggi dan pastikan jarak penggantung rangka plafon sesuai standar (maks. 60 cm)."
+        ),
+        "A.4.5.1.07.JT": _make_ahsp(
+            kode="A.4.5.1.07.JT",
+            bidang="Arsitektur",
+            kategori="Arsitektur - Plafon",
+            elemen_terkait="Plafon",
+            sub_kerusakan="Rusak",
+            nama="Pembongkaran & Penggantian Penutup Plafon Gypsum/GRC + Rangka Hollow",
+            satuan="m2",
+            tingkat_keparahan="Sedang",
+            bobot_fisik=0.95,
+            bobot_fungsi=0.80,
+            is_struktural=False,
+            upah=[
+                {"tenaga": "Pekerja", "koef": 0.140, "satuan": "OH", "harga_satuan": UPAH_JATENG["Pekerja"]},
+                {"tenaga": "Tukang Plafon", "koef": 0.160, "satuan": "OH", "harga_satuan": UPAH_JATENG["Tukang"]},
+                {"tenaga": "Kepala Tukang", "koef": 0.016, "satuan": "OH", "harga_satuan": UPAH_JATENG["Kepala_Tukang"]},
+                {"tenaga": "Mandor", "koef": 0.008, "satuan": "OH", "harga_satuan": UPAH_JATENG["Mandor"]},
+            ],
+            bahan=[
+                {"bahan": "Gypsum Board 9 mm / GRC 4 mm", "koef": 0.364, "satuan": "lbr", "harga_satuan": 88000},
+                {"bahan": "Rangka Hollow Galvanis 4x4 & 2x4 (Penggantian)", "koef": 1.200, "satuan": "m'", "harga_satuan": 18500},
+                {"bahan": "Sekrup Drywall 1 inch & Paku Ramset", "koef": 20.000, "satuan": "buah", "harga_satuan": 350},
+                {"bahan": "Compound, Textile Tape & Cat Plafon", "koef": 0.500, "satuan": "kg", "harga_satuan": 32000},
+            ],
+            langkah_kerja=[
+                "Bongkar panel plafon yang jebol, pecah, atau melendut berat beserta bagian rangka yang bengkok/korosi.",
+                "Pasang dan setel elevasi waterpass rangka hollow galvanis pengganti serta perkuat penggantung (rod/hanger) ke dak/kuda-kuda.",
+                "Pasang lembaran gypsum board / GRC baru memakai sekrup drywall pada jarak grid 20 cm secara rapi.",
+                "Tutup seluruh kepala sekrup dan sambungan papan dengan joint compound + textile tape.",
+                "Amplas sambungan hingga rata, beri list profil jika ada, lalu cat ulang 2 lapis."
+            ],
+            rekomendasi="Untuk area semi-outdoor atau rawan lembab, ganti panel memakai papan GRC/Kalsiboard tahan air agar tidak cepat lapuk."
+        ),
+
+        # ARSITEKTUR 3: PINTU DAN JENDELA
+        "A.4.6.2.10.JT": _make_ahsp(
+            kode="A.4.6.2.10.JT",
+            bidang="Arsitektur",
+            kategori="Arsitektur - Pintu dan Jendela",
+            elemen_terkait="Pintu dan Jendela",
+            sub_kerusakan="Kotor",
+            nama="Pembersihan Menyeluruh Daun, Kusen & Kaca Pintu/Jendela + Pelumasan Hardware",
+            satuan="m2",
+            tingkat_keparahan="Ringan",
+            bobot_fisik=0.35,
+            bobot_fungsi=0.15,
+            is_struktural=False,
+            upah=[
+                {"tenaga": "Pekerja", "koef": 0.070, "satuan": "OH", "harga_satuan": UPAH_JATENG["Pekerja"]},
+                {"tenaga": "Tukang Finishing", "koef": 0.040, "satuan": "OH", "harga_satuan": UPAH_JATENG["Tukang"]},
+                {"tenaga": "Mandor", "koef": 0.004, "satuan": "OH", "harga_satuan": UPAH_JATENG["Mandor"]},
+            ],
+            bahan=[
+                {"bahan": "Cairan Pembersih Kaca & Kusen Netral", "koef": 0.150, "satuan": "liter", "harga_satuan": 38000},
+                {"bahan": "Pelumas Engsel / Silicone Spray", "koef": 0.050, "satuan": "kaleng", "harga_satuan": 65000},
+                {"bahan": "Kain Microfiber & Spons Halus", "koef": 0.250, "satuan": "buah", "harga_satuan": 15000},
+            ],
+            langkah_kerja=[
+                "Bersihkan debu tebal pada rel jendela geser, sudut kusen, dan daun pintu memakai kuas halus dan vacuum.",
+                "Semprotkan cairan pembersih pH netral pada permukaan kusen aluminium/kayu serta kaca, bersihkan dengan kain microfiber.",
+                "Hilangkan noda lem/kerak membandel memakai scraper plastik agar tidak menggores kaca atau powder coating.",
+                "Keringkan permukaan dengan wiper karet hingga bening bebas bercak.",
+                "Semprotkan pelumas silikon pada engsel, rel, dan slot kunci agar bukaan beroperasi lancar."
+            ],
+            rekomendasi="Hindari cairan pembersih bersifat asam kuat/abrasif pada kusen aluminium karena dapat memudarkan lapisan anodized."
+        ),
+        "A.4.6.2.12.JT": _make_ahsp(
+            kode="A.4.6.2.12.JT",
+            bidang="Arsitektur",
+            kategori="Arsitektur - Pintu dan Jendela",
+            elemen_terkait="Pintu dan Jendela",
+            sub_kerusakan="Pelapukan",
+            nama="Perbaikan / Penggantian Bagian Kusen & Daun Pintu Kayu Lapuk + Wood Treatment",
+            satuan="m2",
+            tingkat_keparahan="Berat",
+            bobot_fisik=1.00,
+            bobot_fungsi=0.85,
+            is_struktural=False,
+            upah=[
+                {"tenaga": "Pekerja", "koef": 0.180, "satuan": "OH", "harga_satuan": UPAH_JATENG["Pekerja"]},
+                {"tenaga": "Tukang Kayu Ahli", "koef": 0.350, "satuan": "OH", "harga_satuan": UPAH_JATENG["Tukang_Ahli"]},
+                {"tenaga": "Kepala Tukang", "koef": 0.035, "satuan": "OH", "harga_satuan": UPAH_JATENG["Kepala_Tukang"]},
+                {"tenaga": "Mandor", "koef": 0.010, "satuan": "OH", "harga_satuan": UPAH_JATENG["Mandor"]},
+            ],
+            bahan=[
+                {"bahan": "Kayu Kamper / Meranti Oven Pengganti", "koef": 0.025, "satuan": "m3", "harga_satuan": 7500000},
+                {"bahan": "Cairan Anti Rayap & Pengawet Kayu", "koef": 0.250, "satuan": "liter", "harga_satuan": 75000},
+                {"bahan": "Dempul Kayu (Wood Filler) & Lem Epoxy", "koef": 0.300, "satuan": "kg", "harga_satuan": 55000},
+                {"bahan": "Cat Kayu / Politur Finishing 2 Lapis", "koef": 0.350, "satuan": "kg", "harga_satuan": 72000},
+            ],
+            langkah_kerja=[
+                "Potong dan buang bagian kayu kusen atau kaki daun pintu yang mengalami pelapukan akibat lembab atau serangan rayap.",
+                "Semprotkan cairan anti-rayap dan pengawet kayu pada kayu eksisting yang tersisa serta dinding kontaknya.",
+                "Lakukan penyambungan kayu pengganti kering oven memakai sambungan pen-lubang dan lem epoxy struktural.",
+                "Dempul rapat seluruh sambungan kayu, lalu amplas bertahap hingga profil halus sejajar.",
+                "Lapisi cat dasar menie kayu dan cat/politur finishing tahan cuaca sebanyak 2 lapis."
+            ],
+            rekomendasi="Berikan celah nat 5 mm / sepatu kusen granit di dasar kusen area basah agar kayu tidak kontak langsung dengan genangan air lantai."
+        ),
+        "A.4.6.2.14.JT": _make_ahsp(
+            kode="A.4.6.2.14.JT",
+            bidang="Arsitektur",
+            kategori="Arsitektur - Pintu dan Jendela",
+            elemen_terkait="Pintu dan Jendela",
+            sub_kerusakan="Karat",
+            nama="Pembersihan Korosi Besi/Hardware Pintu & Pengecatan Anti Karat Zinc Chromate",
+            satuan="m2",
+            tingkat_keparahan="Sedang",
+            bobot_fisik=0.75,
+            bobot_fungsi=0.55,
+            is_struktural=False,
+            upah=[
+                {"tenaga": "Pekerja", "koef": 0.110, "satuan": "OH", "harga_satuan": UPAH_JATENG["Pekerja"]},
+                {"tenaga": "Tukang Besi/Cat", "koef": 0.140, "satuan": "OH", "harga_satuan": UPAH_JATENG["Tukang"]},
+                {"tenaga": "Kepala Tukang", "koef": 0.014, "satuan": "OH", "harga_satuan": UPAH_JATENG["Kepala_Tukang"]},
+                {"tenaga": "Mandor", "koef": 0.006, "satuan": "OH", "harga_satuan": UPAH_JATENG["Mandor"]},
+            ],
+            bahan=[
+                {"bahan": "Cat Dasar Anti Karat Zinc Chromate", "koef": 0.220, "satuan": "kg", "harga_satuan": 82000},
+                {"bahan": "Cat Besi Sintetik Gloss Finishing", "koef": 0.250, "satuan": "kg", "harga_satuan": 78000},
+                {"bahan": "Thinner & Amplas Besi / Sikat Kawat", "koef": 0.300, "satuan": "liter", "harga_satuan": 36000},
+            ],
+            langkah_kerja=[
+                "Rontokkan seluruh kerak karat menggunakan sikat kawat baja dan amplas besi hingga logam bersih mengkilap.",
+                "Lap permukaan besi menggunakan kain basah thinner untuk menghilangkan sisa debu karat dan minyak.",
+                "Oleskan segera 1-2 lapis cat dasar anti karat Zinc Chromate / Epoxy Primer secara merata.",
+                "Biarkan cat dasar mengering minimal 6 jam agar perlindungan oksidasi terbentuk sempurna.",
+                "Lapisi cat finishing besi sintetik 2 lapis dan ganti engsel/sekrup yang sudah macet korosif dengan stainless steel."
+            ],
+            rekomendasi="Ganti engsel dan baut pengunci yang mengalami karat parah dengan material stainless steel SUS 304."
+        ),
+        "A.4.6.2.16.JT": _make_ahsp(
+            kode="A.4.6.2.16.JT",
+            bidang="Arsitektur",
+            kategori="Arsitektur - Pintu dan Jendela",
+            elemen_terkait="Pintu dan Jendela",
+            sub_kerusakan="Kaca retak",
+            nama="Pembongkaran & Pemasangan Kaca Bening/Rayben 5 mm Baru + Karet Gasket",
+            satuan="m2",
+            tingkat_keparahan="Sedang",
+            bobot_fisik=0.90,
+            bobot_fungsi=0.80,
+            is_struktural=False,
+            upah=[
+                {"tenaga": "Pekerja", "koef": 0.120, "satuan": "OH", "harga_satuan": UPAH_JATENG["Pekerja"]},
+                {"tenaga": "Tukang Kaca/Aluminium", "koef": 0.200, "satuan": "OH", "harga_satuan": UPAH_JATENG["Tukang_Ahli"]},
+                {"tenaga": "Kepala Tukang", "koef": 0.020, "satuan": "OH", "harga_satuan": UPAH_JATENG["Kepala_Tukang"]},
+                {"tenaga": "Mandor", "koef": 0.008, "satuan": "OH", "harga_satuan": UPAH_JATENG["Mandor"]},
+            ],
+            bahan=[
+                {"bahan": "Kaca Lembaran Tebal 5 mm (Polos/Rayben)", "koef": 1.100, "satuan": "m2", "harga_satuan": 155000},
+                {"bahan": "Karet Gasket Jepit Kaca", "koef": 4.000, "satuan": "m'", "harga_satuan": 8500},
+                {"bahan": "Silicone Sealant Netral", "koef": 0.350, "satuan": "tube", "harga_satuan": 55000},
+            ],
+            langkah_kerja=[
+                "Gunakan sarung tangan anti-sayat & kacamata pelindung, lalu lepaskan list kaca dan karet gasket lama secara hati-hati.",
+                "Bongkar lembaran kaca yang retak secara utuh/bertahap agar pecahan tidak melukai pengguna ruangan.",
+                "Bersihkan alur dudukan kaca pada kusen dari serpihan kaca dan residu sealant lama.",
+                "Pasang ganjalan setting block karet di dasar alur, lalu masukkan lembaran kaca 5 mm baru dengan toleransi muai 3 mm.",
+                "Pasang kembali list penjepit, karet gasket baru, dan segel keliling pertemuan dengan silicone sealant netral."
+            ],
+            rekomendasi="Untuk pintu akses utama atau jendela rendah rawan benturan, pertimbangkan penggunaan kaca tempered atau laminated safety glass."
+        ),
+        "A.4.6.2.04.JT": _make_ahsp(
+            kode="A.4.6.2.04.JT",
+            bidang="Arsitektur",
+            kategori="Arsitektur - Pintu dan Jendela",
+            elemen_terkait="Pintu dan Jendela",
+            sub_kerusakan="Sealent",
+            nama="Penggantian Karet Gasket & Injeksi Ulang Sealant Kaca Kusen Aluminium",
+            satuan="m'",
+            tingkat_keparahan="Ringan",
+            bobot_fisik=0.50,
+            bobot_fungsi=0.45,
+            is_struktural=False,
+            upah=[
+                {"tenaga": "Pekerja", "koef": 0.050, "satuan": "OH", "harga_satuan": UPAH_JATENG["Pekerja"]},
+                {"tenaga": "Tukang Aluminium/Kaca", "koef": 0.080, "satuan": "OH", "harga_satuan": UPAH_JATENG["Tukang"]},
+                {"tenaga": "Kepala Tukang", "koef": 0.008, "satuan": "OH", "harga_satuan": UPAH_JATENG["Kepala_Tukang"]},
+                {"tenaga": "Mandor", "koef": 0.003, "satuan": "OH", "harga_satuan": UPAH_JATENG["Mandor"]},
+            ],
+            bahan=[
+                {"bahan": "Silicone Sealant Netral Tahan Cuaca", "koef": 0.300, "satuan": "tube", "harga_satuan": 55000},
+                {"bahan": "Backer Rod / Gasket Karet EPDM", "koef": 1.050, "satuan": "m'", "harga_satuan": 8000},
+                {"bahan": "Masking Tape Kertas", "koef": 0.500, "satuan": "roll", "harga_satuan": 12000},
+            ],
+            langkah_kerja=[
+                "Kupas tuntas sealant lama yang getas, putus, atau lepas dari celah antara kaca/kusen dan dinding menggunakan cutter khusus.",
+                "Bersihkan celah dari debu dan kelembapan lalu lap dengan cairan pembersih alkohol hingga kering.",
+                "Tempelkan masking tape di sepanjang kedua sisi celah untuk mendapatkan garis sealant yang lurus dan rapi.",
+                "Pasang backer rod / karet gasket jika celah terlalu dalam, lalu tembakkan silicone sealant tipe netral secara kontinu tanpa jeda udara.",
+                "Ratakan alur sealant menggunakan spatula karet cekung, lalu lepaskan masking tape sebelum sealant mengering."
+            ],
+            rekomendasi="Wajib gunakan silicone sealant bertipe netral (non-acidic) agar tidak menimbulkan korosi atau noda bercak pada profil aluminium dan kaca."
+        ),
+
+        # ARSITEKTUR 4: LANTAI
+        "A.4.4.3.02.JT": _make_ahsp(
+            kode="A.4.4.3.02.JT",
+            bidang="Arsitektur",
+            kategori="Arsitektur - Lantai",
+            elemen_terkait="Lantai",
+            sub_kerusakan="Pecah",
+            nama="Pembongkaran & Pemasangan Ulang Lantai Keramik/Granit Pecah + Perekat Instan",
+            satuan="m2",
+            tingkat_keparahan="Sedang",
+            bobot_fisik=0.85,
+            bobot_fungsi=0.65,
+            is_struktural=False,
+            upah=[
+                {"tenaga": "Pekerja", "koef": 0.250, "satuan": "OH", "harga_satuan": UPAH_JATENG["Pekerja"]},
+                {"tenaga": "Tukang Keramik", "koef": 0.200, "satuan": "OH", "harga_satuan": UPAH_JATENG["Tukang"]},
+                {"tenaga": "Kepala Tukang", "koef": 0.020, "satuan": "OH", "harga_satuan": UPAH_JATENG["Kepala_Tukang"]},
+                {"tenaga": "Mandor", "koef": 0.010, "satuan": "OH", "harga_satuan": UPAH_JATENG["Mandor"]},
+            ],
+            bahan=[
+                {"bahan": "Ubin Keramik / Granit Pengganti 60x60", "koef": 1.050, "satuan": "m2", "harga_satuan": 125000},
+                {"bahan": "Semen Instan Perekat Ubin (MU-400)", "koef": 5.500, "satuan": "kg", "harga_satuan": 4800},
+                {"bahan": "Tile Grout Pengisi Nat Elastis", "koef": 0.600, "satuan": "kg", "harga_satuan": 18000},
+            ],
+            langkah_kerja=[
+                "Potong seluruh garis nat di sekeliling keping keramik yang pecah menggunakan mesin gerinda potong tipis agar getaran tidak merambat ke keramik sebelahnya.",
+                "Bongkar keping keramik yang pecah beserta sisa spesi keras di bawahnya, lalu bersihkan dasar lantai dari debu.",
+                "Aplikasikan mortar instan perekat keramik (tile adhesive) pada dasar lantai dan punggung keramik (back-buttering) memakai roskam bergigi.",
+                "Pasang keping ubin pengganti sejajar waterpass dengan keramik sekitar dan beri tile spacer nat selebar 2-3 mm.",
+                "Isi celah nat dengan semen grout polimer setelah perekat mengering minimal 24 jam."
+            ],
+            rekomendasi="Simpan cadangan ubin dari batch produksi yang sama dan hindari beban benturan benda berat sebelum perekat mengeras sempurna."
+        ),
+        "A.4.4.3.05.JT": _make_ahsp(
+            kode="A.4.4.3.05.JT",
+            bidang="Arsitektur",
+            kategori="Arsitektur - Lantai",
+            elemen_terkait="Lantai",
+            sub_kerusakan="Retak",
+            nama="Perbaikan Retak Permukaan Lantai dengan Epoxy Grouting / Penggantian Parsial",
+            satuan="m2",
+            tingkat_keparahan="Sedang",
+            bobot_fisik=0.75,
+            bobot_fungsi=0.55,
+            is_struktural=False,
+            upah=[
+                {"tenaga": "Pekerja", "koef": 0.160, "satuan": "OH", "harga_satuan": UPAH_JATENG["Pekerja"]},
+                {"tenaga": "Tukang Keramik", "koef": 0.150, "satuan": "OH", "harga_satuan": UPAH_JATENG["Tukang"]},
+                {"tenaga": "Kepala Tukang", "koef": 0.015, "satuan": "OH", "harga_satuan": UPAH_JATENG["Kepala_Tukang"]},
+                {"tenaga": "Mandor", "koef": 0.008, "satuan": "OH", "harga_satuan": UPAH_JATENG["Mandor"]},
+            ],
+            bahan=[
+                {"bahan": "Epoxy Resin Filler / Grouting Lantai", "koef": 0.800, "satuan": "kg", "harga_satuan": 115000},
+                {"bahan": "Ubin Pengganti (Cadangan Keping Retak Parah)", "koef": 0.500, "satuan": "m2", "harga_satuan": 125000},
+                {"bahan": "Semen Perekat & Tile Grout", "koef": 2.500, "satuan": "kg", "harga_satuan": 6500},
+            ],
+            langkah_kerja=[
+                "Identifikasi pola retak apakah hanya pada glasur ubin atau menerus ke lapisan screed di bawahnya.",
+                "Untuk retak menerus parah, potong nat dan ganti keping ubin dengan mortar fleksibel; untuk retak garis halus, bersihkan alur retak memakai vacuum.",
+                "Suntikkan atau tuangkan resin epoxy low-viscosity berwarna senada ke dalam celah retak hingga terisi padat.",
+                "Ratakan permukaan berlebih sebelum mengeras dan poles halus setelah curing 12-24 jam.",
+                "Periksa nat di sekitar ubin dan lakukan regrouting jika terdapat celah terbuka."
+            ],
+            rekomendasi="Jika retak membentuk garis panjang melintasi beberapa keping lantai secara berurutan, periksa kemungkinan defleksi balok atau penurunan subbase lantai."
+        ),
+        "A.4.4.3.08.JT": _make_ahsp(
+            kode="A.4.4.3.08.JT",
+            bidang="Arsitektur",
+            kategori="Arsitektur - Lantai",
+            elemen_terkait="Lantai",
+            sub_kerusakan="Kotor",
+            nama="Pembersihan Mendalam (Deep Cleaning) & Poles Noda Membandel Lantai",
+            satuan="m2",
+            tingkat_keparahan="Ringan",
+            bobot_fisik=0.30,
+            bobot_fungsi=0.15,
+            is_struktural=False,
+            upah=[
+                {"tenaga": "Pekerja", "koef": 0.080, "satuan": "OH", "harga_satuan": UPAH_JATENG["Pekerja"]},
+                {"tenaga": "Operator Polisher", "koef": 0.050, "satuan": "OH", "harga_satuan": UPAH_JATENG["Tukang"]},
+                {"tenaga": "Mandor", "koef": 0.004, "satuan": "OH", "harga_satuan": UPAH_JATENG["Mandor"]},
+            ],
+            bahan=[
+                {"bahan": "Cairan Floor Heavy-Duty Degreaser/Cleaner", "koef": 0.200, "satuan": "liter", "harga_satuan": 45000},
+                {"bahan": "Pad Poles Mesin Buffing", "koef": 0.100, "satuan": "buah", "harga_satuan": 75000},
+                {"bahan": "Coating Pelindung Pori (Floor Sealer)", "koef": 0.100, "satuan": "liter", "harga_satuan": 85000},
+            ],
+            langkah_kerja=[
+                "Sapu dan sedot debu serta pasir halus di seluruh permukaan lantai yang kotor.",
+                "Oleskan cairan pembersih noda kerak/minyak (degreaser) yang aman bagi material keramik/granit dan diamkan 10 menit.",
+                "Lakukan penyikatan mekanis memakai mesin floor polisher dengan pad lembut hingga kerak dan noda terangkat.",
+                "Bilas dengan air bersih dan keringkan sisa air memakai wet vacuum / pel microfiber bersih.",
+                "Lakukan buffing akhir atau oleskan sealer pelindung pori agar lantai kembali mengkilap dan tidak licin."
+            ],
+            rekomendasi="Hindari pembersih asam klorida (HCl) pekat karena dapat mengikis lapisan glasur keramik dan merusak nat semen."
+        ),
+        "A.4.4.3.10.JT": _make_ahsp(
+            kode="A.4.4.3.10.JT",
+            bidang="Arsitektur",
+            kategori="Arsitektur - Lantai",
+            elemen_terkait="Lantai",
+            sub_kerusakan="Berjamur",
+            nama="Pembersihan Lantai & Nat Berjamur dengan Anti-Fungal & Regrouting Nat",
+            satuan="m2",
+            tingkat_keparahan="Ringan",
+            bobot_fisik=0.45,
+            bobot_fungsi=0.25,
+            is_struktural=False,
+            upah=[
+                {"tenaga": "Pekerja", "koef": 0.100, "satuan": "OH", "harga_satuan": UPAH_JATENG["Pekerja"]},
+                {"tenaga": "Tukang Keramik", "koef": 0.080, "satuan": "OH", "harga_satuan": UPAH_JATENG["Tukang"]},
+                {"tenaga": "Mandor", "koef": 0.005, "satuan": "OH", "harga_satuan": UPAH_JATENG["Mandor"]},
+            ],
+            bahan=[
+                {"bahan": "Cairan Pembasmi Jamur & Lumut Lantai", "koef": 0.250, "satuan": "liter", "harga_satuan": 52000},
+                {"bahan": "Nat Keramik Anti Jamur (Epoxy Grout)", "koef": 0.450, "satuan": "kg", "harga_satuan": 32000},
+            ],
+            langkah_kerja=[
+                "Sikat permukaan lantai berjamur memakai larutan anti jamur dan pembasmi spora lumut hingga bersih.",
+                "Kerok bagian nat lantai lama yang sudah menghitam dan keropos sedalam 3 mm dengan grout scraper.",
+                "Bilas seluruh lantai dan nat dengan air bersih lalu biarkan kering menyeluruh.",
+                "Isi ulang jalur nat menggunakan semen grout anti-jamur (epoxy/waterproof grout) memakai roskam karet.",
+                "Bersihkan sisa residu grout pada ubin dengan spons lembab setelah 30 menit."
+            ],
+            rekomendasi="Pastikan kemiringan lantai menuju floor drain cukup (1-2%) agar tidak terjadi genangan air permanen yang memicu jamur."
+        ),
+        "A.4.4.3.12.JT": _make_ahsp(
+            kode="A.4.4.3.12.JT",
+            bidang="Arsitektur",
+            kategori="Arsitektur - Lantai",
+            elemen_terkait="Lantai",
+            sub_kerusakan="Popping",
+            nama="Penanganan Lantai Popping (Menggelembung), Pembongkaran & Perekat Fleksibel",
+            satuan="m2",
+            tingkat_keparahan="Sedang",
+            bobot_fisik=0.90,
+            bobot_fungsi=0.75,
+            is_struktural=False,
+            upah=[
+                {"tenaga": "Pekerja", "koef": 0.280, "satuan": "OH", "harga_satuan": UPAH_JATENG["Pekerja"]},
+                {"tenaga": "Tukang Keramik Ahli", "koef": 0.240, "satuan": "OH", "harga_satuan": UPAH_JATENG["Tukang_Ahli"]},
+                {"tenaga": "Kepala Tukang", "koef": 0.024, "satuan": "OH", "harga_satuan": UPAH_JATENG["Kepala_Tukang"]},
+                {"tenaga": "Mandor", "koef": 0.012, "satuan": "OH", "harga_satuan": UPAH_JATENG["Mandor"]},
+            ],
+            bahan=[
+                {"bahan": "Ubin Keramik / Granite Tile Baru 60x60", "koef": 1.050, "satuan": "m2", "harga_satuan": 125000},
+                {"bahan": "Perekat Keramik Fleksibel (High-Flex Adhesive)", "koef": 6.000, "satuan": "kg", "harga_satuan": 7500},
+                {"bahan": "Tile Grout Fleksibel & Movement Joint", "koef": 0.700, "satuan": "kg", "harga_satuan": 22000},
+            ],
+            langkah_kerja=[
+                "Ketuk area sekitar kerusakan (sounding test) untuk menentukan batas ubin yang sudah kopong atau kehilangan daya lekat.",
+                "Bongkar seluruh keping ubin yang terangkat (popping) beserta spesi lama yang terlepas dari screed lantai.",
+                "Bersihkan dan kasarkan/chipping ringan permukaan screed beton serta basahi sedikit dengan air bersih.",
+                "Aplikasikan mortar perekat fleksibel (elastis terhadap muai-susut termal) secara penuh di lantai dan punggung ubin tanpa rongga udara.",
+                "Pasang ubin baru dengan jarak nat minimal 3 mm dan sediakan celah expansion joint diisi polyurethane sealant di tepi ruangan."
+            ],
+            rekomendasi="Sediakan celah muai (expansion joint) 5-8 mm setiap bentang 4-5 meter agar tegangan termal tidak mendorong ubin terangkat kembali."
+        ),
+        "A.4.4.3.15.JT": _make_ahsp(
+            kode="A.4.4.3.15.JT",
+            bidang="Arsitektur",
+            kategori="Arsitektur - Lantai",
+            elemen_terkait="Lantai",
+            sub_kerusakan="Gumpil",
+            nama="Perbaikan Lantai Gumpil (Chipping) dengan Resin Epoxy Filler / Tambal Ubin",
+            satuan="m2",
+            tingkat_keparahan="Ringan",
+            bobot_fisik=0.55,
+            bobot_fungsi=0.35,
+            is_struktural=False,
+            upah=[
+                {"tenaga": "Pekerja", "koef": 0.120, "satuan": "OH", "harga_satuan": UPAH_JATENG["Pekerja"]},
+                {"tenaga": "Tukang Keramik", "koef": 0.140, "satuan": "OH", "harga_satuan": UPAH_JATENG["Tukang"]},
+                {"tenaga": "Kepala Tukang", "koef": 0.014, "satuan": "OH", "harga_satuan": UPAH_JATENG["Kepala_Tukang"]},
+                {"tenaga": "Mandor", "koef": 0.006, "satuan": "OH", "harga_satuan": UPAH_JATENG["Mandor"]},
+            ],
+            bahan=[
+                {"bahan": "Resin Epoxy Filler Pengisi Keramik/Granit", "koef": 0.650, "satuan": "kg", "harga_satuan": 118000},
+                {"bahan": "Pigmen Pewarna Senada Ubin", "koef": 0.100, "satuan": "tube", "harga_satuan": 45000},
+                {"bahan": "Pad Amplas Air & Batu Poles Halus", "koef": 0.500, "satuan": "buah", "harga_satuan": 15000},
+            ],
+            langkah_kerja=[
+                "Bersihkan bagian sudut atau tepi ubin yang gumpil/cuil dari debu, lemak, dan serpihan glasur longgar.",
+                "Lap bagian gumpil memakai thinner/alkohol agar kering bebas kontaminasi.",
+                "Campurkan resin epoxy filler dua komponen bersama pigmen warna hingga menyerupai warna dasar lantai.",
+                "Isikan adonan filler sedikit lebih tinggi pada titik gumpil dengan kape dan biarkan mengeras 4-6 jam.",
+                "Ratakan dan haluskan tambalan memakai amplas air halus berurutan (grid 400 hingga 1000) agar menyatu rata tanpa tepi tajam."
+            ],
+            rekomendasi="Jika gumpil berada di tepi ambang pintu berisiko tersandung atau meluas, pasang list penutup transisi aluminium/kuningan."
+        ),
+
+        # ARSITEKTUR 5: ATAP
+        "A.4.5.2.01.JT": _make_ahsp(
+            kode="A.4.5.2.01.JT",
+            bidang="Arsitektur",
+            kategori="Arsitektur - Atap",
+            elemen_terkait="Atap",
+            sub_kerusakan="Bocor",
+            nama="Perbaikan Penutup Atap Bocor, Flashing Nok/Talang & Pelapisan Anti Bocor",
+            satuan="m2",
+            tingkat_keparahan="Sedang",
+            bobot_fisik=0.90,
+            bobot_fungsi=0.85,
+            is_struktural=False,
+            upah=[
+                {"tenaga": "Pekerja", "koef": 0.150, "satuan": "OH", "harga_satuan": UPAH_JATENG["Pekerja"]},
+                {"tenaga": "Tukang Atap", "koef": 0.160, "satuan": "OH", "harga_satuan": UPAH_JATENG["Tukang"]},
+                {"tenaga": "Kepala Tukang", "koef": 0.016, "satuan": "OH", "harga_satuan": UPAH_JATENG["Kepala_Tukang"]},
+                {"tenaga": "Mandor", "koef": 0.008, "satuan": "OH", "harga_satuan": UPAH_JATENG["Mandor"]},
+            ],
+            bahan=[
+                {"bahan": "Waterproofing Elastomer + Serat Membrane", "koef": 1.250, "satuan": "kg", "harga_satuan": 65000},
+                {"bahan": "Sealant Karet Sekrup / Flashing Bitumen", "koef": 0.400, "satuan": "m2", "harga_satuan": 72000},
+                {"bahan": "Sekrup Roofing Karet Pengganti", "koef": 6.000, "satuan": "buah", "harga_satuan": 1200},
+            ],
+            langkah_kerja=[
+                "Telusuri jalur aliran air saat hujan atau uji siram untuk menemukan titik bocor (celah nok, sambungan jurai, atau karet baut getas).",
+                "Bersihkan area sambungan genteng/spandek, flashing dinding, dan talang air dari lumut dan endapan tanah.",
+                "Ganti baut roofing yang karet sealnya getas dan perbaiki kedudukan tumpang tindih (overlap) penutup atap.",
+                "Pasang membrane serat polyester + waterproofing elastomer 2 lapis menyilang pada pertemuan nok, jurai, dan talang.",
+                "Lakukan uji siram air mengalir minimal 15 menit guna memverifikasi tidak ada lagi rembesan ke ruang bawah."
+            ],
+            rekomendasi="Periksa rutin seal karet sekrup atap metal dan pertemuan flashing dinding parapet menjelang musim hujan."
+        ),
+        "A.4.5.2.04.JT": _make_ahsp(
+            kode="A.4.5.2.04.JT",
+            bidang="Arsitektur",
+            kategori="Arsitektur - Atap",
+            elemen_terkait="Atap",
+            sub_kerusakan="Pecah",
+            nama="Pembongkaran & Penggantian Penutup Atap Genteng / Spandek Pecah",
+            satuan="m2",
+            tingkat_keparahan="Sedang",
+            bobot_fisik=0.95,
+            bobot_fungsi=0.80,
+            is_struktural=False,
+            upah=[
+                {"tenaga": "Pekerja", "koef": 0.160, "satuan": "OH", "harga_satuan": UPAH_JATENG["Pekerja"]},
+                {"tenaga": "Tukang Atap", "koef": 0.180, "satuan": "OH", "harga_satuan": UPAH_JATENG["Tukang"]},
+                {"tenaga": "Kepala Tukang", "koef": 0.018, "satuan": "OH", "harga_satuan": UPAH_JATENG["Kepala_Tukang"]},
+                {"tenaga": "Mandor", "koef": 0.008, "satuan": "OH", "harga_satuan": UPAH_JATENG["Mandor"]},
+            ],
+            bahan=[
+                {"bahan": "Penutup Atap Pengganti (Genteng / Spandek)", "koef": 1.100, "satuan": "m2", "harga_satuan": 115000},
+                {"bahan": "Sekrup / Pengikat Atap & Kawat Pengait", "koef": 8.000, "satuan": "buah", "harga_satuan": 1200},
+                {"bahan": "Adukan Semen / Sealant Sambungan", "koef": 1.500, "satuan": "kg", "harga_satuan": 12000},
+            ],
+            langkah_kerja=[
+                "Gunakan sabuk pengaman kerja ketinggian (body harness) dan papan pijakan agar beban terdistribusi pada reng/gording.",
+                "Angkat dan keluarkan lembaran atau keping penutup atap yang pecah serta bersihkan dudukan reng.",
+                "Periksa apakah terdapat reng kayu yang patah atau reng baja ringan melendut; perkuat terlebih dahulu bila rusak.",
+                "Pasang keping genteng/lembaran atap pengganti sesuai pola kunci kaitan (interlocking) dan panjang tumpang tindih standar.",
+                "Kencangkan baut/pengait anti angin dan tutup kembali adukan nok jika terdampak pembongkaran."
+            ],
+            rekomendasi="Saat mengganti atap di area ketinggian, wajib gunakan safety harness dan lakukan pengecekan jarak reng sesuai modul penutup atap baru."
+        ),
+        "A.4.5.2.07.JT": _make_ahsp(
+            kode="A.4.5.2.07.JT",
+            bidang="Arsitektur",
+            kategori="Arsitektur - Atap",
+            elemen_terkait="Atap",
+            sub_kerusakan="Karat",
+            nama="Pembersihan Korosi Penutup/Rangka Atap Metal & Pelapisan Cat Anti Karat",
+            satuan="m2",
+            tingkat_keparahan="Sedang",
+            bobot_fisik=0.80,
+            bobot_fungsi=0.65,
+            is_struktural=False,
+            upah=[
+                {"tenaga": "Pekerja", "koef": 0.130, "satuan": "OH", "harga_satuan": UPAH_JATENG["Pekerja"]},
+                {"tenaga": "Tukang Besi/Cat", "koef": 0.140, "satuan": "OH", "harga_satuan": UPAH_JATENG["Tukang"]},
+                {"tenaga": "Kepala Tukang", "koef": 0.014, "satuan": "OH", "harga_satuan": UPAH_JATENG["Kepala_Tukang"]},
+                {"tenaga": "Mandor", "koef": 0.007, "satuan": "OH", "harga_satuan": UPAH_JATENG["Mandor"]},
+            ],
+            bahan=[
+                {"bahan": "Rust Converter / Primer Epoxy Anti Karat", "koef": 0.250, "satuan": "kg", "harga_satuan": 92000},
+                {"bahan": "Cat Atap Metal Tahan Cuaca (Weatherproof)", "koef": 0.280, "satuan": "kg", "harga_satuan": 78000},
+                {"bahan": "Sikat Kawat & Kain Lap Pembersih", "koef": 0.250, "satuan": "buah", "harga_satuan": 15000},
+            ],
+            langkah_kerja=[
+                "Gosok dan rontokkan lapisan karat aktif pada atap seng/galvalum/rangka baja memakai sikat kawat hingga bersih.",
+                "Bilas serbuk karat menggunakan air bertekanan rendah dan biarkan kering di bawah sinar matahari.",
+                "Kuaskan rust converter / primer anti karat zinc-rich pada seluruh titik bekas korosi.",
+                "Lapisi cat finishing atap metal tahan UV sebanyak 2 lapis hingga menutup sempurna.",
+                "Untuk titik karat yang sudah berlubang tembus, tambal terlebih dahulu memakai flashing aluminium foil bitumen."
+            ],
+            rekomendasi="Jika pelat atap metal mengalami keropos tembus luas (> 30% luasan), pertimbangkan penggantian lembaran atap secara utuh."
+        ),
+        "A.4.5.2.10.JT": _make_ahsp(
+            kode="A.4.5.2.10.JT",
+            bidang="Arsitektur",
+            kategori="Arsitektur - Atap",
+            elemen_terkait="Atap",
+            sub_kerusakan="Kotor",
+            nama="Pembersihan Kotoran Daun, Sampah & Pelancaran Talang Penutup Atap",
+            satuan="m2",
+            tingkat_keparahan="Ringan",
+            bobot_fisik=0.35,
+            bobot_fungsi=0.25,
+            is_struktural=False,
+            upah=[
+                {"tenaga": "Pekerja", "koef": 0.075, "satuan": "OH", "harga_satuan": UPAH_JATENG["Pekerja"]},
+                {"tenaga": "Tukang Atap", "koef": 0.045, "satuan": "OH", "harga_satuan": UPAH_JATENG["Tukang"]},
+                {"tenaga": "Mandor", "koef": 0.004, "satuan": "OH", "harga_satuan": UPAH_JATENG["Mandor"]},
+            ],
+            bahan=[
+                {"bahan": "Karung Pengumpul Sampah & Saringan Talang", "koef": 0.200, "satuan": "buah", "harga_satuan": 15000},
+                {"bahan": "Air Kerja & Sabun Pembersih Netral", "koef": 0.150, "satuan": "liter", "harga_satuan": 25000},
+            ],
+            langkah_kerja=[
+                "Angkut tumpukan daun kering, ranting, lumpur, dan sampah pada permukaan atap dan saluran talang jurai.",
+                "Masukkan sampah ke dalam karung kerja agar tidak jatuh mengotori area bawah gedung.",
+                "Semprot bersih alur gelombang genteng/spandek serta pipa pembuangan talang tegak.",
+                "Pasang saringan kawat (leaf guard) di mulut roof drain/corong talang untuk mencegah penyumbatan ulang.",
+                "Pastikan aliran air mengalir lancar turun hingga saluran drainase halaman."
+            ],
+            rekomendasi="Jadwalkan pembersihan rutin atap dan talang minimal 2 kali setahun (sebelum dan pertengahan musim penghujan)."
+        ),
+        "A.4.5.2.12.JT": _make_ahsp(
+            kode="A.4.5.2.12.JT",
+            bidang="Arsitektur",
+            kategori="Arsitektur - Atap",
+            elemen_terkait="Atap",
+            sub_kerusakan="Jamur",
+            nama="Pembersihan Lumut/Jamur Atap High-Pressure & Coating Pelindung Genteng",
+            satuan="m2",
+            tingkat_keparahan="Ringan",
+            bobot_fisik=0.45,
+            bobot_fungsi=0.30,
+            is_struktural=False,
+            upah=[
+                {"tenaga": "Pekerja", "koef": 0.100, "satuan": "OH", "harga_satuan": UPAH_JATENG["Pekerja"]},
+                {"tenaga": "Tukang Cat/Atap", "koef": 0.090, "satuan": "OH", "harga_satuan": UPAH_JATENG["Tukang"]},
+                {"tenaga": "Mandor", "koef": 0.005, "satuan": "OH", "harga_satuan": UPAH_JATENG["Mandor"]},
+            ],
+            bahan=[
+                {"bahan": "Cairan Algicidal / Anti Lumut Atap", "koef": 0.200, "satuan": "liter", "harga_satuan": 55000},
+                {"bahan": "Cat Coating Genteng Anti Jamur & UV", "koef": 0.250, "satuan": "kg", "harga_satuan": 64000},
+            ],
+            langkah_kerja=[
+                "Semprot permukaan atap dari arah bubungan turun ke tepi menggunakan jet washer untuk merontokkan lumut dan jamur tebal.",
+                "Semprotkan larutan anti lumut (algicide) secara merata untuk mematikan spora akar jamur di pori-pori genteng.",
+                "Biarkan atap mengering sempurna di bawah sinar matahari selama 1 hari.",
+                "Aplikasikan 2 lapis cat pelindung genteng (roof coating) tahan cuaca agar pori tertutup rapat dan air cepat meluncur turun."
+            ],
+            rekomendasi="Pangkas dahan pohon yang terlalu rindang menaungi atap untuk mengurangi kelembapan berlebih pemicu lumut."
+        ),
+
+        # STRUKTUR BETON BERTULANG
+        "A.4.1.1.18.JT": _make_ahsp(
+            kode="A.4.1.1.18.JT",
+            bidang="Struktur",
+            kategori="Struktur - Balok Beton Bertulang",
+            elemen_terkait="Balok Beton Bertulang",
+            sub_kerusakan="Retak Struktur (Crack)",
+            nama="Perbaikan Retak Balok/Kolom dengan Injeksi Epoxy Resin Bertekanan",
+            satuan="m'",
+            tingkat_keparahan="Berat",
+            bobot_fisik=1.15,
+            bobot_fungsi=1.00,
+            is_struktural=True,
+            upah=[
+                {"tenaga": "Pekerja", "koef": 0.200, "satuan": "OH", "harga_satuan": UPAH_JATENG["Pekerja"]},
+                {"tenaga": "Tukang Khusus Injeksi", "koef": 0.250, "satuan": "OH", "harga_satuan": UPAH_JATENG["Tukang_Ahli"]},
+                {"tenaga": "Kepala Tukang", "koef": 0.025, "satuan": "OH", "harga_satuan": UPAH_JATENG["Kepala_Tukang"]},
+                {"tenaga": "Mandor", "koef": 0.012, "satuan": "OH", "harga_satuan": UPAH_JATENG["Mandor"]},
+            ],
+            bahan=[
+                {"bahan": "Low Viscosity Epoxy Resin", "koef": 0.850, "satuan": "kg", "harga_satuan": 165000},
+                {"bahan": "Epoxy Surface Sealant Paste", "koef": 0.500, "satuan": "kg", "harga_satuan": 95000},
+                {"bahan": "Injection Port / Nipple", "koef": 5.000, "satuan": "buah", "harga_satuan": 5000},
+            ],
+            langkah_kerja=[
                 "Pemetaan celah retak dan pengukuran lebar celah menggunakan crack width gauge microscope.",
                 "Pembersihan permukaan beton dan penutupan celah luar dengan pasta epoxy surface sealer.",
                 "Pemasangan injection ports (nipple) pada jarak interval 15 - 20 cm sepanjang alur retak.",
                 "Injeksi epoxy resin viskositas rendah menggunakan pompa tekanan konstan hingga keluar di port sebelahnya.",
                 "Pelepasan nipple dan perataan permukaan beton setelah waktu pengerasan (curing) 24 jam."
             ],
-            "rekomendasi": "Lakukan evaluasi pembebanan struktur balok dan batasi muatan hidup sementara di atas lantai yang terdampak."
-        },
-        "A.4.1.1.20.JT": {
-            "kode": "A.4.1.1.20.JT",
-            "kategori": "Pekerjaan Struktur Beton",
-            "nama": "Perbaikan Beton Keropos/Spalling dengan Patching Mortar Semen Polimer",
-            "satuan": "m2",
-            "harga_satuan": 245000,
-            "elemen_terkait": "Kolom Struktur Beton",
-            "jenis_kerusakan": "Spalling / Keropos Beton & Selimut Terkelupas",
-            "tingkat_keparahan": "Berat",
-            "koefisien_upah": [
-                {"tenaga": "Pekerja", "koef": 0.280, "satuan": "OH"},
-                {"tenaga": "Tukang Batu Ahli", "koef": 0.200, "satuan": "OH"},
-                {"tenaga": "Kepala Tukang", "koef": 0.020, "satuan": "OH"},
-                {"tenaga": "Mandor", "koef": 0.015, "satuan": "OH"}
+            rekomendasi="Lakukan evaluasi pembebanan struktur balok dan batasi muatan hidup sementara di atas lantai yang terdampak."
+        ),
+        "A.4.1.1.20.JT": _make_ahsp(
+            kode="A.4.1.1.20.JT",
+            bidang="Struktur",
+            kategori="Struktur - Kolom Struktur Beton",
+            elemen_terkait="Kolom Struktur Beton",
+            sub_kerusakan="Spalling / Keropos",
+            nama="Perbaikan Beton Keropos/Spalling & Exposed Rebar dengan Patching Mortar Polimer",
+            satuan="m2",
+            tingkat_keparahan="Berat",
+            bobot_fisik=1.15,
+            bobot_fungsi=1.00,
+            is_struktural=True,
+            upah=[
+                {"tenaga": "Pekerja", "koef": 0.280, "satuan": "OH", "harga_satuan": UPAH_JATENG["Pekerja"]},
+                {"tenaga": "Tukang Batu Ahli", "koef": 0.200, "satuan": "OH", "harga_satuan": UPAH_JATENG["Tukang_Ahli"]},
+                {"tenaga": "Kepala Tukang", "koef": 0.020, "satuan": "OH", "harga_satuan": UPAH_JATENG["Kepala_Tukang"]},
+                {"tenaga": "Mandor", "koef": 0.015, "satuan": "OH", "harga_satuan": UPAH_JATENG["Mandor"]},
             ],
-            "koefisien_bahan": [
-                {"bahan": "Structural Repair Mortar (Polimer)", "koef": 18.000, "satuan": "kg"},
-                {"bahan": "Zinc-Rich Anti-Corrosion Primer", "koef": 0.350, "satuan": "kg"},
-                {"bahan": "Semen Bonding Agent", "koef": 0.500, "satuan": "liter"}
+            bahan=[
+                {"bahan": "Structural Repair Mortar Non-Shrink", "koef": 18.000, "satuan": "kg", "harga_satuan": 8500},
+                {"bahan": "Zinc-Rich Anti-Corrosion Primer", "koef": 0.350, "satuan": "kg", "harga_satuan": 110000},
+                {"bahan": "Semen Bonding Agent", "koef": 0.500, "satuan": "liter", "harga_satuan": 55000},
             ],
-            "langkah_kerja": [
+            langkah_kerja=[
                 "Pembongkaran (chipping) beton keropos dan berongga hingga mencapai batas beton padat (sound concrete).",
-                "Pembersihan kerak karat pada besi tulangan menggunakan sikat kawat baja baja wire brush.",
+                "Pembersihan kerak karat pada besi tulangan menggunakan sikat kawat baja wire brush.",
                 "Pelapisan pelindung anti korosi berbahan dasar zinc-rich primer pada seluruh tulangan baja yang terekspos.",
                 "Penyapuan bonding agent sintetis pada bidang kontak beton lama.",
                 "Aplikasi mortar polimer non-shrink bertahap (layer by layer) dan pemadatan manual hingga rata rapi."
             ],
-            "rekomendasi": "Pastikan tebal selimut beton minimal 30 mm terpenuhi kembali guna melindungi baja tulangan dari karbonasi atmosfer."
-        },
-        "A.4.4.3.35.JT": {
-            "kode": "A.4.4.3.35.JT",
-            "kategori": "Pekerjaan Kedap Air (Waterproofing)",
-            "nama": "Pelapisan Waterproofing Membrane / Polyurethane Pelat Dak Atap",
-            "satuan": "m2",
-            "harga_satuan": 175000,
-            "elemen_terkait": "Pelat Lantai / Dak Beton",
-            "jenis_kerusakan": "Rembesan Air & Retak Rambut Plat Atap Dak",
-            "tingkat_keparahan": "Sedang",
-            "koefisien_upah": [
-                {"tenaga": "Pekerja", "koef": 0.150, "satuan": "OH"},
-                {"tenaga": "Tukang Khusus Pelapis", "koef": 0.120, "satuan": "OH"},
-                {"tenaga": "Kepala Tukang", "koef": 0.012, "satuan": "OH"},
-                {"tenaga": "Mandor", "koef": 0.008, "satuan": "OH"}
+            rekomendasi="Pastikan tebal selimut beton minimal 30 mm terpenuhi kembali guna melindungi baja tulangan dari karbonasi atmosfer."
+        ),
+        "A.4.4.3.35.JT": _make_ahsp(
+            kode="A.4.4.3.35.JT",
+            bidang="Struktur",
+            kategori="Struktur - Pelat Lantai / Dak Beton",
+            elemen_terkait="Pelat Lantai / Dak Beton",
+            sub_kerusakan="Rembesan / Bocor & Efflorescence",
+            nama="Pelapisan Waterproofing Membrane / Polyurethane Pelat Dak Beton",
+            satuan="m2",
+            tingkat_keparahan="Sedang",
+            bobot_fisik=0.90,
+            bobot_fungsi=0.75,
+            is_struktural=True,
+            upah=[
+                {"tenaga": "Pekerja", "koef": 0.150, "satuan": "OH", "harga_satuan": UPAH_JATENG["Pekerja"]},
+                {"tenaga": "Tukang Khusus Pelapis", "koef": 0.120, "satuan": "OH", "harga_satuan": UPAH_JATENG["Tukang_Ahli"]},
+                {"tenaga": "Kepala Tukang", "koef": 0.012, "satuan": "OH", "harga_satuan": UPAH_JATENG["Kepala_Tukang"]},
+                {"tenaga": "Mandor", "koef": 0.008, "satuan": "OH", "harga_satuan": UPAH_JATENG["Mandor"]},
             ],
-            "koefisien_bahan": [
-                {"bahan": "Liquid Polyurethane Waterproofing", "koef": 1.600, "satuan": "kg"},
-                {"bahan": "Primer Bitumen / Epoxy Substrate", "koef": 0.250, "satuan": "kg"},
-                {"bahan": "Polyester Mesh Reinforcement", "koef": 1.100, "satuan": "m2"}
+            bahan=[
+                {"bahan": "Liquid Polyurethane Waterproofing", "koef": 1.600, "satuan": "kg", "harga_satuan": 75000},
+                {"bahan": "Primer Bitumen / Epoxy Substrate", "koef": 0.250, "satuan": "kg", "harga_satuan": 65000},
+                {"bahan": "Polyester Mesh Reinforcement", "koef": 1.100, "satuan": "m2", "harga_satuan": 18000},
             ],
-            "langkah_kerja": [
-                "Pembersihan lumut, debu, dan residu kotoran pada permukaan dak beton.",
+            langkah_kerja=[
+                "Pembersihan lumut, efloresensi garam, debu, dan residu kotoran pada permukaan dak beton.",
                 "Pembuatan fillet lengkung (chamfer) 5x5 cm pada pertemuan antara pelat lantai dengan parapet dinding.",
                 "Pelapisan primer perekat dan pemasangan serat mesh pada area sudut dan retakan.",
                 "Aplikasi waterproofing polyurethane lapis pertama dan kedua secara menyilang.",
                 "Uji genang air (ponding test) selama minimal 24 jam untuk menjamin integritas kekedapan air."
             ],
-            "rekomendasi": "Cek kemiringan slope dak beton menuju roof drain minimal 1.5% untuk mencegah genangan air terakumulasi."
-        },
-        "A.4.5.1.07.JT": {
-            "kode": "A.4.5.1.07.JT",
-            "kategori": "Pekerjaan Langit-langit (Plafon)",
-            "nama": "Penggantian Penutup Plafon Gypsum Board 9 mm Rangka Galvanis",
-            "satuan": "m2",
-            "harga_satuan": 135000,
-            "elemen_terkait": "Plafon Gypsum / Akustik",
-            "jenis_kerusakan": "Plafon Lendut, Lapuk & Noda Coklat Akibat Bocor",
-            "tingkat_keparahan": "Ringan",
-            "koefisien_upah": [
-                {"tenaga": "Pekerja", "koef": 0.100, "satuan": "OH"},
-                {"tenaga": "Tukang Plafon", "koef": 0.120, "satuan": "OH"},
-                {"tenaga": "Kepala Tukang", "koef": 0.012, "satuan": "OH"},
-                {"tenaga": "Mandor", "koef": 0.005, "satuan": "OH"}
-            ],
-            "koefisien_bahan": [
-                {"bahan": "Gypsum Board 9 mm (Water-Resistant)", "koef": 0.364, "satuan": "lbr"},
-                {"bahan": "Sekrup Drywall 1 inch", "koef": 18.000, "satuan": "buah"},
-                {"bahan": "Compound Joint Filler & Paper Tape", "koef": 0.250, "satuan": "kg"}
-            ],
-            "langkah_kerja": [
-                "Pelepasan panel plafon gypsum yang lapuk, lendut atau berjamur.",
-                "Pengecekan dan perbaikan sumber kebocoran instalasi pipa air atau talang di atas plafon.",
-                "Perkuatan dan penyetelan elevasi rangka hollow galvanis penggantung.",
-                "Pemasangan lembaran gypsum board baru dengan sekrup drywall teratur berjarak 20 cm.",
-                "Pendempulan sambungan dengan joint compound, pemasangan paper tape, pengamplasan, dan pengecatan."
-            ],
-            "rekomendasi": "Pastikan sumber tetesan air dari lantai atas telah tuntas diperbaiki sebelum penutup plafon baru dipasang."
-        },
-        "A.4.4.3.02.JT": {
-            "kode": "A.4.4.3.02.JT",
-            "kategori": "Pekerjaan Penutup Lantai",
-            "nama": "Pembongkaran & Pasang Ulang Keramik Lantai Perekat Semen Instan",
-            "satuan": "m2",
-            "harga_satuan": 220000,
-            "elemen_terkait": "Lantai Keramik / Granit",
-            "jenis_kerusakan": "Keramik Menggelembung & Terangkat (Popping)",
-            "tingkat_keparahan": "Sedang",
-            "koefisien_upah": [
-                {"tenaga": "Pekerja", "koef": 0.250, "satuan": "OH"},
-                {"tenaga": "Tukang Keramik", "koef": 0.200, "satuan": "OH"},
-                {"tenaga": "Kepala Tukang", "koef": 0.020, "satuan": "OH"},
-                {"tenaga": "Mandor", "koef": 0.010, "satuan": "OH"}
-            ],
-            "koefisien_bahan": [
-                {"bahan": "Ubin Keramik / Homogeneous Tile 60x60", "koef": 1.050, "satuan": "m2"},
-                {"bahan": "Semen Instan Perekat Keramik", "koef": 5.500, "satuan": "kg"},
-                {"bahan": "Tile Grout Pengisi Nat Kedap Air", "koef": 0.600, "satuan": "kg"}
-            ],
-            "langkah_kerja": [
-                "Pembongkaran keramik yang kopong atau terangkat beserta spesi lama sampai ke pelat beton.",
-                "Pembersihan permukaan lantai dari debu dan serpihan adukan semen.",
-                "Aplikasi adukan semen instan perekat ubin (tile adhesive) menggunakan roskam bergigi.",
-                "Pemasangan ubin keramik baru dengan menjaga jarak nat ekspansi selebar 2-3 mm.",
-                "Pengisian celah nat menggunakan semen grout polimer elastis setelah perekat kering 24 jam."
-            ],
-            "rekomendasi": "Sediakan expansion joint berisi polyurethane sealant pada bentang lantai setiap 5 meter untuk antisipasi termal."
-        },
-        "A.4.7.1.10.JT": {
-            "kode": "A.4.7.1.10.JT",
-            "kategori": "Pekerjaan Pengecatan",
-            "nama": "Pengerokan Cat Lama & Pengecatan Ulang Dinding Gedung 2 Lapis",
-            "satuan": "m2",
-            "harga_satuan": 46500,
-            "elemen_terkait": "Dinding Eksterior / Interior",
-            "jenis_kerusakan": "Pengelupasan, Pengapuran & Jamur Cat Dinding",
-            "tingkat_keparahan": "Ringan",
-            "koefisien_upah": [
-                {"tenaga": "Pekerja", "koef": 0.070, "satuan": "OH"},
-                {"tenaga": "Tukang Cat", "koef": 0.090, "satuan": "OH"},
-                {"tenaga": "Kepala Tukang", "koef": 0.009, "satuan": "OH"},
-                {"tenaga": "Mandor", "koef": 0.004, "satuan": "OH"}
-            ],
-            "koefisien_bahan": [
-                {"bahan": "Cat Tembok Mutu Tinggi (Akrilik)", "koef": 0.280, "satuan": "kg"},
-                {"bahan": "Alkali-Resisting Primer Sealer", "koef": 0.120, "satuan": "liter"},
-                {"bahan": "Plamir Tembok Acrylic", "koef": 0.100, "satuan": "kg"}
-            ],
-            "langkah_kerja": [
-                "Pengerokan cat lama yang terkelupas dan pengapuran memakai kape besi sampai substrat bersih.",
-                "Pencucian permukaan dinding dan pembersihan spora lumut menggunakan larutan fungisida.",
-                "Pelapisan 1 lapis alkali resisting primer sealer untuk mencegah serangan alkali semen.",
-                "Aplikasi plamir tipis pada bagian dinding yang bopeng atau pori kasar.",
-                "Pengecatan cat dinding akrilik 2 lapis hingga warna menutup merata dan homogen."
-            ],
-            "rekomendasi": "Hindari pengecatan pada saat kelembapan dinding masih tinggi (> 16% berdasarkan moisture meter)."
-        },
-        "A.4.6.2.04.JT": {
-            "kode": "A.4.6.2.04.JT",
-            "kategori": "Pekerjaan Pintu & Jendela",
-            "nama": "Perbaikan Kusen & Daun Pintu/Jendela Aluminium + Sealant",
-            "satuan": "m'",
-            "harga_satuan": 165000,
-            "elemen_terkait": "Kusen Pintu / Jendela Aluminium",
-            "jenis_kerusakan": "Kusen Miring, Karet Lepas & Rembesan Air Kaca",
-            "tingkat_keparahan": "Ringan",
-            "koefisien_upah": [
-                {"tenaga": "Pekerja", "koef": 0.080, "satuan": "OH"},
-                {"tenaga": "Tukang Aluminium", "koef": 0.140, "satuan": "OH"},
-                {"tenaga": "Kepala Tukang", "koef": 0.014, "satuan": "OH"},
-                {"tenaga": "Mandor", "koef": 0.007, "satuan": "OH"}
-            ],
-            "koefisien_bahan": [
-                {"bahan": "Sealant Silicone Netral Eksterior", "koef": 0.350, "satuan": "tube"},
-                {"bahan": "Weatherstrip Gasket Karet EPDM", "koef": 1.050, "satuan": "m'"},
-                {"bahan": "Sekrup Stainless Steel & Fisher", "koef": 4.000, "satuan": "buah"}
-            ],
-            "langkah_kerja": [
-                "Penyetelan kembali kedudukan kusen aluminium dan sekrup penahan perimeter.",
-                "Penggantian gasket karet penjepit kaca yang telah mengeras atau getas.",
-                "Pembersihan sealant lama yang rusak pada celah antara kusen aluminium dan dinding.",
-                "Aplikasi masking tape dan penyuntikan silicone sealant netral tahan cuaca secara kontinu.",
-                "Perataan alur sealant menggunakan spatula karet dan pelepasan masking tape sebelum sealant berkulit."
-            ],
-            "rekomendasi": "Gunakan sealant tipe netral (non-acidic) agar tidak merusak finishing powder coating atau anodized profil aluminium."
-        }
+            rekomendasi="Cek kemiringan slope dak beton menuju roof drain minimal 1.5% untuk mencegah genangan air terakumulasi."
+        ),
     }
 
     @classmethod
@@ -1342,12 +2136,81 @@ class AHSPKnowledgeBase:
         return cls.CATALOG.get(kode)
 
     @classmethod
+    def find_by_element_and_defect(cls, elemen: str, sub_kerusakan: str = "") -> Dict[str, Any]:
+        """Mencari data AHSP paling akurat berdasarkan elemen/objek inspeksi & sub-jenis kerusakan."""
+        el_clean = elemen.replace("Arsitektur - ", "").replace("Struktur - ", "").strip().lower()
+        sub_clean = sub_kerusakan.strip().lower()
+
+        if sub_clean and "otomatis" not in sub_clean:
+            for item in cls.CATALOG.values():
+                item_el = item["elemen_terkait"].lower()
+                item_sub = item["sub_kerusakan"].lower()
+                if (item_el in el_clean or el_clean in item_el) and (
+                    sub_clean == item_sub or sub_clean in item_sub or item_sub in sub_clean
+                ):
+                    return item
+
+        return cls.find_by_element(elemen)
+
+    @classmethod
     def find_by_element(cls, elemen: str) -> Dict[str, Any]:
         """Mencari data AHSP yang paling cocok berdasarkan elemen gedung."""
+        el_clean = elemen.replace("Arsitektur - ", "").replace("Struktur - ", "").strip().lower()
         for item in cls.CATALOG.values():
-            if item["elemen_terkait"].lower() in elemen.lower() or elemen.lower() in item["elemen_terkait"].lower():
+            if item["elemen_terkait"].lower() in el_clean or el_clean in item["elemen_terkait"].lower():
                 return item
         return cls.CATALOG["A.4.4.1.25.JT"]
+
+    @classmethod
+    def compute_material_breakdown(cls, kode: str, volume: float) -> Dict[str, Any]:
+        """Menghitung rincian biaya terperinci per tenaga kerja dan per masing-masing bahan sesuai volume."""
+        item = cls.get_by_code(kode) or cls.CATALOG["A.4.4.1.25.JT"]
+        upah_rows = []
+        bahan_rows = []
+        tot_upah_satuan = 0.0
+        tot_bahan_satuan = 0.0
+
+        for u in item.get("koefisien_upah", []):
+            k = float(u.get("koef", 0))
+            h = float(u.get("harga_satuan", 0))
+            keb_riil = round(k * volume, 3)
+            tot_upah_satuan += k * h
+            upah_rows.append({
+                "Unsur Tenaga Kerja": u.get("tenaga", "-"),
+                "Koefisien": f"{k:.3f}",
+                "Satuan": u.get("satuan", "OH"),
+                "Harga Satuan": int(h),
+                "Kebutuhan Riil": f"{keb_riil:.3f} {u.get('satuan', 'OH')}",
+                "Jumlah Biaya": int(round(keb_riil * h))
+            })
+
+        for b in item.get("koefisien_bahan", []):
+            k = float(b.get("koef", 0))
+            h = float(b.get("harga_satuan", 0))
+            keb_riil = round(k * volume, 3)
+            tot_bahan_satuan += k * h
+            bahan_rows.append({
+                "Nama Bahan / Material": b.get("bahan", "-"),
+                "Koefisien": f"{k:.3f}",
+                "Satuan": b.get("satuan", "-"),
+                "Harga Satuan": int(h),
+                "Kebutuhan Riil": f"{keb_riil:.2f} {b.get('satuan', '')}",
+                "Jumlah Biaya": int(round(keb_riil * h))
+            })
+
+        subtotal_langsung = int(round((tot_upah_satuan + tot_bahan_satuan) * volume))
+        overhead_total = int(round(subtotal_langsung * 0.15))
+        grand_total = int(round(volume * item["harga_satuan"]))
+        return {
+            "upah_rows": upah_rows,
+            "bahan_rows": bahan_rows,
+            "subtotal_upah": sum(r["Jumlah Biaya"] for r in upah_rows),
+            "subtotal_bahan": sum(r["Jumlah Biaya"] for r in bahan_rows),
+            "subtotal_langsung": subtotal_langsung,
+            "overhead_15": overhead_total,
+            "harga_satuan": item["harga_satuan"],
+            "grand_total": grand_total
+        }
 
 
 # ==================================================================================================
@@ -1367,22 +2230,24 @@ class AIAgentClient:
         elemen_gedung: str,
         endpoint_url: str = "",
         api_key: str = "",
-        force_simulation: bool = False
+        force_simulation: bool = False,
+        luas_total: float = 25.0,
+        jenis_kerusakan_pilihan: str = "Deteksi Otomatis AI"
     ) -> Dict[str, Any]:
         """
         Mengubah foto ke format Base64 dan memproses citra melalui inferensi YOLOv8
         atau endpoint API eksternal via protokol HTTP POST JSON.
         """
-        # Konversi file gambar ke Base64 string
         base64_encoded_img = base64.b64encode(image_bytes).decode("utf-8")
         current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        # Payload sesuai protokol API
         payload = {
             "image_base64": base64_encoded_img,
             "filename": filename,
             "volume": float(volume),
+            "luas_total": float(luas_total),
             "elemen_gedung": elemen_gedung,
+            "jenis_kerusakan_pilihan": jenis_kerusakan_pilihan,
             "acuan_standar": "AHSP Dinas PU Bina Marga & Cipta Karya Jawa Tengah 2023",
             "timestamp": current_time
         }
@@ -1396,26 +2261,37 @@ class AIAgentClient:
 
         target_url = endpoint_url.strip() if endpoint_url.strip() else cls.DEFAULT_ENDPOINT
 
-        # 1. Jika pengguna memilih mode simulasi sidang mandiri (offline safety)
+        # 1. Jika pengguna memilih mode simulasi offline
         if force_simulation:
-            return cls._deterministic_civil_ai_engine(elemen_gedung, volume, filename, "Simulasi Mandiri (Offline Safe)")
+            return cls._deterministic_civil_ai_engine(
+                elemen_gedung, volume, filename, "Simulasi Mandiri (Offline Safe)",
+                luas_total=luas_total, jenis_kerusakan_pilihan=jenis_kerusakan_pilihan
+            )
 
-        # 2. Cek apakah ada model YOLOv8 kustom hasil training (weights/best.pt)
-        local_yolo_result = cls.detect_with_local_yolo(image_bytes, elemen_gedung, volume, filename)
+        # 2. Jalankan inferensi model YOLOv8 kustom (weights/best.pt)
+        local_yolo_result = cls.detect_with_local_yolo(
+            image_bytes, elemen_gedung, volume, filename,
+            luas_total=luas_total, jenis_kerusakan_pilihan=jenis_kerusakan_pilihan
+        )
         if local_yolo_result is not None:
             return local_yolo_result
 
-        # Jika model weights/best.pt ditemukan tapi ultralytics belum terpasang
         model_path = cls.get_yolo_model_path()
         if model_path:
-            fallback = cls._deterministic_civil_ai_engine(elemen_gedung, volume, filename, "Standalone Civil AI Engine")
+            fallback = cls._deterministic_civil_ai_engine(
+                elemen_gedung, volume, filename, "Standalone Civil AI Engine",
+                luas_total=luas_total, jenis_kerusakan_pilihan=jenis_kerusakan_pilihan
+            )
             try:
-                import ultralytics
+                import ultralytics  # noqa: F401
             except ImportError:
-                fallback["warning"] = f"Model bobot '{os.path.basename(model_path)}' ditemukan di folder weights, namun pustaka 'ultralytics' belum selesai diinstal. Sistem sementara dialihkan ke Standalone Civil Engine."
+                fallback["warning"] = (
+                    f"Model bobot '{os.path.basename(model_path)}' ditemukan, namun pustaka 'ultralytics' "
+                    "belum terpasang. Dialihkan ke Standalone Civil Engine."
+                )
                 return fallback
 
-        # 3. Eksekusi HTTP POST Call (hanya jika target_url bukan default localhost:8000 atau server lokal sengaja dinyalakan)
+        # 3. Eksekusi HTTP POST Call (jika custom endpoint disiapkan)
         if target_url and target_url != cls.DEFAULT_ENDPOINT:
             try:
                 response = requests.post(target_url, json=payload, headers=headers, timeout=8)
@@ -1424,19 +2300,24 @@ class AIAgentClient:
                     result["is_live_api"] = True
                     result["api_endpoint_used"] = target_url
                     return result
-                else:
-                    fallback = cls._deterministic_civil_ai_engine(elemen_gedung, volume, filename, f"HTTP Error {response.status_code}")
-                    fallback["warning"] = f"Endpoint merespons status {response.status_code}. Beralih ke Standalone Engine."
-                    return fallback
+                fallback = cls._deterministic_civil_ai_engine(
+                    elemen_gedung, volume, filename, f"HTTP Error {response.status_code}",
+                    luas_total=luas_total, jenis_kerusakan_pilihan=jenis_kerusakan_pilihan
+                )
+                fallback["warning"] = f"Endpoint merespons status {response.status_code}. Beralih ke Standalone Engine."
+                return fallback
             except Exception as exc:
-                fallback = cls._deterministic_civil_ai_engine(elemen_gedung, volume, filename, "Standalone Engine (Auto-Fallback)")
+                fallback = cls._deterministic_civil_ai_engine(
+                    elemen_gedung, volume, filename, "Standalone Engine (Auto-Fallback)",
+                    luas_total=luas_total, jenis_kerusakan_pilihan=jenis_kerusakan_pilihan
+                )
                 fallback["warning"] = f"Koneksi endpoint '{target_url}' tidak merespons ({type(exc).__name__}). Dialihkan ke Standalone Civil AI Engine."
                 return fallback
 
-        # Default fallback jika tidak ada custom endpoint dan model weights belum aktif
-        fallback = cls._deterministic_civil_ai_engine(elemen_gedung, volume, filename, "Standalone Civil AI Engine")
-        fallback["warning"] = "Mode Standalone Civil Engine aktif. Model best.pt siap digunakan setelah pustaka ultralytics dimuat."
-        return fallback
+        return cls._deterministic_civil_ai_engine(
+            elemen_gedung, volume, filename, "Standalone Civil AI Engine",
+            luas_total=luas_total, jenis_kerusakan_pilihan=jenis_kerusakan_pilihan
+        )
 
     @classmethod
     def get_yolo_model_path(cls) -> Optional[str]:
@@ -1453,72 +2334,120 @@ class AIAgentClient:
         return None
 
     @classmethod
-    def _map_yolo_defect_to_ahsp(cls, class_name: str, elemen_gedung: str) -> Dict[str, Any]:
-        """Memetakan 4 kelas YOLO CONCRETE-25FEB ke item katalog AHSP Jateng 2023."""
-        c_lower = str(class_name).lower()
-        if "crack" in c_lower:
-            if "balok" in elemen_gedung.lower():
-                return {
-                    "kode_ahsp": "A.4.1.1.18.JT",
-                    "elemen_terkait": "Balok Beton Bertulang",
-                    "jenis_kerusakan": "Retak Diagonal Lentur/Geser Balok Struktur",
-                    "tingkat_keparahan": "Berat"
-                }
-            elif "dak" in elemen_gedung.lower() or "pelat" in elemen_gedung.lower():
-                return {
-                    "kode_ahsp": "A.4.4.3.35.JT",
-                    "elemen_terkait": "Pelat Lantai / Dak Beton",
-                    "jenis_kerusakan": "Rembesan Air & Retak Rambut Plat Atap Dak",
-                    "tingkat_keparahan": "Sedang"
-                }
-            else:
-                return {
-                    "kode_ahsp": "A.4.4.1.25.JT",
-                    "elemen_terkait": "Dinding Pasangan Bata / Hebel",
-                    "jenis_kerusakan": "Retak Plesteran & Retak Rambut Dinding",
-                    "tingkat_keparahan": "Sedang"
-                }
-        elif "spalling" in c_lower:
-            return {
-                "kode_ahsp": "A.4.1.1.20.JT",
-                "elemen_terkait": "Kolom Struktur Beton",
-                "jenis_kerusakan": "Spalling / Keropos Beton & Selimut Terkelupas",
-                "tingkat_keparahan": "Berat"
-            }
-        elif "rebar" in c_lower:
-            return {
-                "kode_ahsp": "A.4.1.1.20.JT",
-                "elemen_terkait": "Kolom Struktur Beton",
-                "jenis_kerusakan": "Besi Tulangan Terbuka & Keropos Beton (Exposed Rebar)",
-                "tingkat_keparahan": "Berat"
-            }
-        elif "efflorescence" in c_lower:
-            if "dinding" in elemen_gedung.lower():
-                return {
-                    "kode_ahsp": "A.4.6.2.04.JT",
-                    "elemen_terkait": "Dinding Eksterior / Interior",
-                    "jenis_kerusakan": "Cat Dinding Mengelupas, Mengapur & Berjamur (Efflorescence)",
-                    "tingkat_keparahan": "Ringan"
-                }
-            else:
-                return {
-                    "kode_ahsp": "A.4.4.3.35.JT",
-                    "elemen_terkait": "Pelat Lantai / Dak Beton",
-                    "jenis_kerusakan": "Rembesan Air & Efloresensi Garam Pelat Beton",
-                    "tingkat_keparahan": "Sedang"
-                }
-        else:
-            item = AHSPKnowledgeBase.find_by_element(elemen_gedung)
+    def _map_yolo_defect_to_ahsp(
+        cls, class_name: str, elemen_gedung: str, jenis_kerusakan_pilihan: str = "Deteksi Otomatis AI"
+    ) -> Dict[str, Any]:
+        """
+        Memetakan hasil deteksi YOLOv8 secara ketat di dalam lingkup Objek Inspeksi terpilih,
+        sehingga elemen arsitektur (Lantai/Plafon/Pintu/Atap/Dinding) tidak tertukar ke elemen struktur.
+        """
+        if jenis_kerusakan_pilihan and "otomatis" not in jenis_kerusakan_pilihan.lower():
+            item = AHSPKnowledgeBase.find_by_element_and_defect(elemen_gedung, jenis_kerusakan_pilihan)
             return {
                 "kode_ahsp": item["kode"],
                 "elemen_terkait": item["elemen_terkait"],
                 "jenis_kerusakan": item["jenis_kerusakan"],
-                "tingkat_keparahan": item["tingkat_keparahan"]
+                "tingkat_keparahan": item["tingkat_keparahan"],
             }
+
+        c_lower = str(class_name).lower()
+        el_lower = elemen_gedung.lower()
+
+        if "lantai" in el_lower and "dak" not in el_lower:
+            sub = "Pecah" if ("spalling" in c_lower or "rebar" in c_lower) else ("Berjamur" if "efflorescence" in c_lower else "Retak")
+            item = AHSPKnowledgeBase.find_by_element_and_defect("Lantai", sub)
+        elif "plafon" in el_lower:
+            sub = "Rusak" if ("spalling" in c_lower or "rebar" in c_lower) else ("Kebocoran" if "efflorescence" in c_lower else "Retak")
+            item = AHSPKnowledgeBase.find_by_element_and_defect("Plafon", sub)
+        elif "pintu" in el_lower or "jendela" in el_lower:
+            sub = "Kaca retak" if "crack" in c_lower else ("Pelapukan" if ("spalling" in c_lower or "rebar" in c_lower) else "Karat")
+            item = AHSPKnowledgeBase.find_by_element_and_defect("Pintu dan Jendela", sub)
+        elif "atap" in el_lower and "dak" not in el_lower:
+            sub = "Pecah" if ("crack" in c_lower or "spalling" in c_lower) else ("Jamur" if "efflorescence" in c_lower else "Karat")
+            item = AHSPKnowledgeBase.find_by_element_and_defect("Atap", sub)
+        elif "dinding" in el_lower or "partisi" in el_lower:
+            sub = "Pengelupasan cat" if ("spalling" in c_lower or "efflorescence" in c_lower) else "Retak rambut"
+            item = AHSPKnowledgeBase.find_by_element_and_defect("Dinding dan Partisi", sub)
+        elif "balok" in el_lower:
+            item = AHSPKnowledgeBase.get_by_code("A.4.1.1.18.JT" if "crack" in c_lower else "A.4.1.1.20.JT")
+        elif "kolom" in el_lower:
+            item = AHSPKnowledgeBase.get_by_code("A.4.1.1.18.JT" if "crack" in c_lower else "A.4.1.1.20.JT")
+        elif "dak" in el_lower or "pelat" in el_lower:
+            item = AHSPKnowledgeBase.get_by_code("A.4.4.3.35.JT" if ("crack" in c_lower or "efflorescence" in c_lower) else "A.4.1.1.20.JT")
+        else:
+            item = AHSPKnowledgeBase.find_by_element(elemen_gedung)
+
+        return {
+            "kode_ahsp": item["kode"],
+            "elemen_terkait": item["elemen_terkait"],
+            "jenis_kerusakan": item["jenis_kerusakan"],
+            "tingkat_keparahan": item["tingkat_keparahan"],
+        }
+
+    @classmethod
+    def _build_analysis_result(
+        cls,
+        ahsp_item: Dict[str, Any],
+        volume: float,
+        luas_total: float,
+        filename: str,
+        mode_label: str,
+        agent_id: str,
+        is_yolo_active: bool,
+        confidence_score: float,
+        detected_boxes: Optional[List[Dict[str, Any]]] = None,
+        warning: str = ""
+    ) -> Dict[str, Any]:
+        """Menyusun paket hasil analisis standar dengan skala prosentase dan tingkat keparahan yang logis."""
+        harga_satuan = ahsp_item["harga_satuan"]
+        total_biaya = int(round(volume * harga_satuan))
+        temp_item = {
+            "elemen_gedung": ahsp_item["elemen_terkait"],
+            "jenis_kerusakan": ahsp_item["jenis_kerusakan"],
+            "kode_ahsp": ahsp_item["kode"],
+            "volume": float(volume),
+            "luas_total": float(luas_total),
+        }
+        eval_res = compute_condition_assessment(temp_item)
+        res = {
+            "status": "success",
+            "agent_id": agent_id,
+            "mode": mode_label,
+            "is_live_api": False,
+            "is_yolo_active": is_yolo_active,
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "filename": filename,
+            "elemen_gedung": ahsp_item["elemen_terkait"],
+            "jenis_kerusakan": ahsp_item["jenis_kerusakan"],
+            "tingkat_keparahan": eval_res["keparahan"],
+            "persentase_kerusakan": eval_res["persentase_kerusakan"],
+            "luas_total": eval_res["luas_total"],
+            "confidence_score": round(confidence_score, 1),
+            "kode_ahsp": ahsp_item["kode"],
+            "deskripsi_ahsp": ahsp_item["nama"],
+            "volume": float(volume),
+            "satuan": ahsp_item["satuan"],
+            "harga_satuan": harga_satuan,
+            "total_biaya": total_biaya,
+            "langkah_kerja": ahsp_item["langkah_kerja"],
+            "rekomendasi": ahsp_item["rekomendasi"],
+            "acuan_regulasi": "AHSP Dinas Bina Marga & Cipta Karya Provinsi Jawa Tengah 2023",
+            "detected_boxes": detected_boxes or [],
+            "total_detected_defects": len(detected_boxes) if detected_boxes else 0,
+        }
+        if warning:
+            res["warning"] = warning
+        return res
 
     @classmethod
     def detect_with_local_yolo(
-        cls, image_bytes: bytes, elemen_gedung: str, volume: float, filename: str
+        cls,
+        image_bytes: bytes,
+        elemen_gedung: str,
+        volume: float,
+        filename: str,
+        luas_total: float = 25.0,
+        jenis_kerusakan_pilihan: str = "Deteksi Otomatis AI"
     ) -> Optional[Dict[str, Any]]:
         """Menjalankan inferensi lokal YOLOv8 jika file weights/best.pt terdeteksi."""
         model_path = cls.get_yolo_model_path()
@@ -1533,7 +2462,6 @@ class AIAgentClient:
         try:
             model = YOLO(model_path)
             img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
-            # Ambang batas conf=0.15 agar retak rambut & gompal samar tetap terdeteksi
             results = model(img, conf=0.15, verbose=False)
             if not results or len(results) == 0:
                 return None
@@ -1550,117 +2478,83 @@ class AIAgentClient:
                     conf = float(b.conf[0].item()) * 100.0
                     cls_id = int(b.cls[0].item())
                     cls_name = model_names.get(cls_id, "Crack")
-                    ahsp_map = cls._map_yolo_defect_to_ahsp(cls_name, elemen_gedung)
+                    ahsp_map = cls._map_yolo_defect_to_ahsp(cls_name, elemen_gedung, jenis_kerusakan_pilihan)
+                    item_temp = AHSPKnowledgeBase.get_by_code(ahsp_map["kode_ahsp"]) or AHSPKnowledgeBase.find_by_element(elemen_gedung)
+                    sev_eval = compute_condition_assessment({
+                        "elemen_gedung": item_temp["elemen_terkait"],
+                        "jenis_kerusakan": item_temp["jenis_kerusakan"],
+                        "kode_ahsp": item_temp["kode"],
+                        "volume": volume,
+                        "luas_total": luas_total,
+                    })
 
                     boxes_data.append({
                         "box": coords,
                         "class_name": cls_name,
                         "label": ahsp_map["jenis_kerusakan"],
                         "confidence": round(conf, 1),
-                        "keparahan": ahsp_map["tingkat_keparahan"],
+                        "keparahan": sev_eval["keparahan"],
                         "kode_ahsp": ahsp_map["kode_ahsp"]
                     })
 
             if not boxes_data:
-                # Jika tidak ada defect terdeteksi di atas conf 0.15, gunakan acuan elemen dengan status informatif
-                ahsp_item = AHSPKnowledgeBase.find_by_element(elemen_gedung)
-                harga_satuan = ahsp_item["harga_satuan"]
-                total_biaya = int(round(volume * harga_satuan))
-                return {
-                    "status": "success",
-                    "agent_id": "yolov8-custom-model-engine",
-                    "mode": f"YOLOv8 Engine ({os.path.basename(model_path)})",
-                    "is_live_api": False,
-                    "is_yolo_active": True,
-                    "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    "filename": filename,
-                    "elemen_gedung": ahsp_item["elemen_terkait"],
-                    "jenis_kerusakan": ahsp_item["jenis_kerusakan"],
-                    "tingkat_keparahan": ahsp_item["tingkat_keparahan"],
-                    "confidence_score": 95.0,
-                    "kode_ahsp": ahsp_item["kode"],
-                    "deskripsi_ahsp": ahsp_item["nama"],
-                    "volume": volume,
-                    "satuan": ahsp_item["satuan"],
-                    "harga_satuan": harga_satuan,
-                    "total_biaya": total_biaya,
-                    "langkah_kerja": ahsp_item["langkah_kerja"],
-                    "rekomendasi": ahsp_item["rekomendasi"],
-                    "acuan_regulasi": "AHSP Dinas Bina Marga & Cipta Karya Provinsi Jawa Tengah 2023",
-                    "warning": f"Model YOLOv8 ({os.path.basename(model_path)}) aktif memindai citra (tidak ada anomali berat di atas ambang batas 15%). Menggunakan estimasi acuan elemen terpilih.",
-                    "detected_boxes": [],
-                    "total_detected_defects": 0
-                }
+                ahsp_item = AHSPKnowledgeBase.find_by_element_and_defect(elemen_gedung, jenis_kerusakan_pilihan)
+                return cls._build_analysis_result(
+                    ahsp_item=ahsp_item,
+                    volume=volume,
+                    luas_total=luas_total,
+                    filename=filename,
+                    mode_label=f"YOLOv8 Engine ({os.path.basename(model_path)})",
+                    agent_id="yolov8-custom-model-engine",
+                    is_yolo_active=True,
+                    confidence_score=95.0,
+                    detected_boxes=[],
+                    warning=f"Model YOLOv8 ({os.path.basename(model_path)}) memindai citra dan memetakan parameter kerusakan pada elemen terpilih."
+                )
 
             main_box = max(boxes_data, key=lambda x: x["confidence"])
-            ahsp_item = AHSPKnowledgeBase.get_by_code(main_box["kode_ahsp"])
-            if not ahsp_item:
-                ahsp_item = AHSPKnowledgeBase.find_by_element(elemen_gedung)
-
-            harga_satuan = ahsp_item["harga_satuan"]
-            total_biaya = int(round(volume * harga_satuan))
-
-            return {
-                "status": "success",
-                "agent_id": "yolov8-custom-model-engine",
-                "mode": f"YOLOv8 Local Model ({os.path.basename(model_path)})",
-                "is_live_api": False,
-                "is_yolo_active": True,
-                "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                "filename": filename,
-                "elemen_gedung": ahsp_item["elemen_terkait"],
-                "jenis_kerusakan": main_box["label"],
-                "tingkat_keparahan": main_box["keparahan"],
-                "confidence_score": round(main_box["confidence"], 1),
-                "kode_ahsp": ahsp_item["kode"],
-                "deskripsi_ahsp": ahsp_item["nama"],
-                "volume": volume,
-                "satuan": ahsp_item["satuan"],
-                "harga_satuan": harga_satuan,
-                "total_biaya": total_biaya,
-                "langkah_kerja": ahsp_item["langkah_kerja"],
-                "rekomendasi": ahsp_item["rekomendasi"],
-                "acuan_regulasi": "AHSP Dinas Bina Marga & Cipta Karya Provinsi Jawa Tengah 2023",
-                "detected_boxes": boxes_data,
-                "total_detected_defects": len(boxes_data)
-            }
+            ahsp_item = AHSPKnowledgeBase.get_by_code(main_box["kode_ahsp"]) or AHSPKnowledgeBase.find_by_element_and_defect(elemen_gedung, jenis_kerusakan_pilihan)
+            return cls._build_analysis_result(
+                ahsp_item=ahsp_item,
+                volume=volume,
+                luas_total=luas_total,
+                filename=filename,
+                mode_label=f"YOLOv8 Local Model ({os.path.basename(model_path)})",
+                agent_id="yolov8-custom-model-engine",
+                is_yolo_active=True,
+                confidence_score=main_box["confidence"],
+                detected_boxes=boxes_data
+            )
         except Exception:
             return None
 
     @classmethod
     def _deterministic_civil_ai_engine(
-        cls, elemen_gedung: str, volume: float, filename: str, mode_label: str
+        cls,
+        elemen_gedung: str,
+        volume: float,
+        filename: str,
+        mode_label: str,
+        luas_total: float = 25.0,
+        jenis_kerusakan_pilihan: str = "Deteksi Otomatis AI"
     ) -> Dict[str, Any]:
-        """Mesin analisis teknik sipil deterministik berbasis katalog AHSP Jateng 2023."""
-        ahsp_item = AHSPKnowledgeBase.find_by_element(elemen_gedung)
-        harga_satuan = ahsp_item["harga_satuan"]
-        total_biaya = int(round(volume * harga_satuan))
-
-        return {
-            "status": "success",
-            "agent_id": "yolov8-civil-vision-engine",
-            "mode": mode_label,
-            "is_live_api": False,
-            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "filename": filename,
-            "elemen_gedung": ahsp_item["elemen_terkait"],
-            "jenis_kerusakan": ahsp_item["jenis_kerusakan"],
-            "tingkat_keparahan": ahsp_item["tingkat_keparahan"],
-            "confidence_score": 97.2,
-            "kode_ahsp": ahsp_item["kode"],
-            "deskripsi_ahsp": ahsp_item["nama"],
-            "volume": volume,
-            "satuan": ahsp_item["satuan"],
-            "harga_satuan": harga_satuan,
-            "total_biaya": total_biaya,
-            "langkah_kerja": ahsp_item["langkah_kerja"],
-            "rekomendasi": ahsp_item["rekomendasi"],
-            "acuan_regulasi": "AHSP Dinas Bina Marga & Cipta Karya Provinsi Jawa Tengah 2023"
-        }
+        """Mesin analisis teknik sipil berbasis katalog AHSP Jateng 2023 dan rasio prosentase kerusakan."""
+        ahsp_item = AHSPKnowledgeBase.find_by_element_and_defect(elemen_gedung, jenis_kerusakan_pilihan)
+        return cls._build_analysis_result(
+            ahsp_item=ahsp_item,
+            volume=volume,
+            luas_total=luas_total,
+            filename=filename,
+            mode_label=mode_label,
+            agent_id="yolov8-civil-vision-engine",
+            is_yolo_active=False,
+            confidence_score=97.2,
+            detected_boxes=[]
+        )
 
 
 # ==================================================================================================
-# 5. GENERATOR LAPORAN PENILAIAN KONDISI (IKBG) & ESTIMASI RAB (EXCEL & PDF)
+# 5. GENERATOR LAPORAN PENILAIAN KONDISI (IKBG) & ESTIMASI RAB (PDF)
 # ==================================================================================================
 def format_rupiah(val: float) -> str:
     """Format angka ke format mata uang Rupiah."""
@@ -1694,64 +2588,78 @@ def angka_ke_terbilang(n: int) -> str:
 def compute_condition_assessment(item: Dict[str, Any]) -> Dict[str, Any]:
     """
     Menghitung matriks penilaian kondisi fisik dan fungsi komponen bangunan gedung (IKBG)
-    sesuai standar evaluasi keandalan bangunan (Permen PUPR No. 24/PRT/M/2008).
-    Formula:
-      - Nilai Kondisi Fisik = (Nilai Awal) x (Rating Fisik) / 100
-      - Nilai Kondisi Fungsi = (Nilai Awal) x (Rating Fungsi) / 100
-      - Sub Total = Nilai Kondisi Fisik + Nilai Kondisi Fungsi
-      - Bobot: Fisik 50%, Fungsi 50%
-      - Kinerja Total (µku) = (50% x Fisik) + (50% x Fungsi)
-      - Klasifikasi:
-          * Rutin: µku > 90
-          * Preventif: µku = 70 - 90
-          * Korektif: µku = 50 - 70
-          * Rehabilitatif: µku < 50
+    berbasis rasio luasan/volume kerusakan terhadap total komponen di ruangan
+    (Mengacu Permen PUPR No. 24/PRT/M/2008 & Permen PUPR No. 22/PRT/M/2018).
     """
     elemen = item.get("elemen_gedung", "Komponen Bangunan")
-    kerusakan = item.get("jenis_kerusakan", "Retak / Kerusakan Permukaan")
-    keparahan = item.get("tingkat_keparahan")
-    if not keparahan:
-        kode = item.get("kode_ahsp", "")
-        keparahan = AHSPKnowledgeBase.CATALOG.get(kode, {}).get("tingkat_keparahan", "Sedang")
+    kerusakan = item.get("jenis_kerusakan", "Kerusakan Permukaan")
+    kode = item.get("kode_ahsp", "")
+    ahsp_meta = AHSPKnowledgeBase.CATALOG.get(kode, {})
 
-    # Nilai Awal selalu 100%
+    vol = float(item.get("volume") or 0.0)
+    luas_total = float(item.get("luas_total") or 0.0)
+    if luas_total <= 0:
+        luas_total = max(20.0, vol * 2.5 if vol > 0 else 20.0)
+
+    # Rasio Prosentase Kerusakan (0 - 100%)
+    if item.get("persentase_kerusakan") is not None and float(item.get("persentase_kerusakan") or 0) > 0 and vol <= 0:
+        persentase_kerusakan = min(100.0, max(0.1, float(item.get("persentase_kerusakan"))))
+    else:
+        persentase_kerusakan = min(100.0, max(0.1, round((vol / luas_total) * 100.0, 2)))
+
+    bobot_fisik = float(ahsp_meta.get("bobot_fisik", 0.75))
+    bobot_fungsi = float(ahsp_meta.get("bobot_fungsi", 0.55))
+    is_struktural = bool(ahsp_meta.get("is_struktural", False))
+
     nilai_awal = 100
 
-    if keparahan == "Ringan":
-        skor_fisik = 90.0
-        skor_fungsi = 100.0
-        desc_fisik = f"Secara Visual {elemen} Masih Baik , Mungkin ada goresan dan Bercak Noda Sedikit Tidak Terlalu Berpengaruh dengan kegiatan operasional/proses belajar mengajar."
-        desc_fungsi = f"Untuk Fungsi Pada {elemen} Tergolong Baik masih berfungsi dengan baik memikul beban kerja normal."
-    elif keparahan == "Sedang":
-        skor_fisik = 65.0
-        skor_fungsi = 80.0
-        desc_fisik = f"Secara Visual {elemen} Cukup, terdapat {kerusakan} pada beberapa luasan tertentu. Memerlukan penanganan pemeliharaan preventif."
-        desc_fungsi = f"Untuk Fungsi Pada {elemen} Tergolong Cukup, komponen masih mampu bekerja namun keandalan mulai tereduksi."
-    else:  # Berat
-        skor_fisik = 40.0
-        skor_fungsi = 55.0
-        desc_fisik = f"Secara Visual {elemen} Mengalami Kerusakan Berat ({kerusakan}). Integritas material atau selimut pelindung mengalami kerusakan struktural."
-        desc_fungsi = f"Untuk Fungsi Pada {elemen} Mengalami Penurunan Signifikan, kapasitas layan terganggu dan membutuhkan tindakan rehabilitasi intensif."
+    # Skor Fisik & Fungsi berkurang proporsional terhadap prosentase kerusakan dan bobot jenis cacat
+    skor_fisik = round(max(5.0, min(99.9, 100.0 - (persentase_kerusakan * bobot_fisik))), 1)
+    skor_fungsi = round(max(10.0, min(100.0, 100.0 - (persentase_kerusakan * bobot_fungsi))), 1)
 
-    # Distribusi kolom Kondisi Penilaian: Baik (79.5-100%), Cukup (49.5-79.49%), Rusak (0-49.49%)
+    kinerja_f = round(0.5 * skor_fisik, 1)
+    kinerja_fn = round(0.5 * skor_fungsi, 1)
+    total_kinerja = round(kinerja_f + kinerja_fn, 1)
+
+    # Penentuan Tingkat Keparahan berbasis rasio prosentase & klasifikasi PUPR
+    if is_struktural and persentase_kerusakan > 25.0:
+        keparahan = "Berat"
+    elif persentase_kerusakan <= 15.0 and total_kinerja >= 79.5:
+        keparahan = "Ringan"
+    elif persentase_kerusakan <= 45.0 and total_kinerja >= 50.0:
+        keparahan = "Sedang"
+    else:
+        keparahan = "Berat"
+
+    if keparahan == "Ringan":
+        desc_fisik = (
+            f"Secara visual kondisi {elemen} masih tergolong Baik (prosentase kerusakan {persentase_kerusakan:.1f}% "
+            f"dari total {luas_total:.1f} {ahsp_meta.get('satuan', 'm2')}; temuan: {kerusakan})."
+        )
+        desc_fungsi = f"Fungsi layanan {elemen} tetap berjalan normal dan tidak mengganggu aktivitas operasional ruangan."
+    elif keparahan == "Sedang":
+        desc_fisik = (
+            f"Secara visual {elemen} berstatus Cukup (prosentase kerusakan {persentase_kerusakan:.1f}% "
+            f"dari total {luas_total:.1f} {ahsp_meta.get('satuan', 'm2')}; temuan: {kerusakan})."
+        )
+        desc_fungsi = f"Fungsi layanan {elemen} mulai tereduksi pada area terdampak dan membutuhkan pemeliharaan korektif terencana."
+    else:
+        desc_fisik = (
+            f"Secara visual {elemen} mengalami kerusakan Berat (prosentase kerusakan {persentase_kerusakan:.1f}% "
+            f"dari total {luas_total:.1f} {ahsp_meta.get('satuan', 'm2')}; temuan: {kerusakan})."
+        )
+        desc_fungsi = f"Fungsi layanan {elemen} mengalami penurunan signifikan dan berisiko terhadap kenyamanan maupun keselamatan."
+
     baik_f = skor_fisik if skor_fisik >= 79.5 else ""
     cukup_f = skor_fisik if 49.5 <= skor_fisik < 79.5 else ""
     rusak_f = skor_fisik if skor_fisik < 49.5 else ""
-    nilai_kondisi_f = skor_fisik
 
     baik_fn = skor_fungsi if skor_fungsi >= 79.5 else ""
     cukup_fn = skor_fungsi if 49.5 <= skor_fungsi < 79.5 else ""
     rusak_fn = skor_fungsi if skor_fungsi < 49.5 else ""
-    nilai_kondisi_fn = skor_fungsi
 
-    subtotal = int(round(nilai_kondisi_f + nilai_kondisi_fn))
+    subtotal = int(round(skor_fisik + skor_fungsi))
 
-    # Bobot & Kinerja: Fisik 50%, Fungsi 50%
-    kinerja_f = round(0.5 * nilai_kondisi_f, 1)
-    kinerja_fn = round(0.5 * nilai_kondisi_fn, 1)
-    total_kinerja = round(kinerja_f + kinerja_fn, 1)
-
-    # Klasifikasi Tingkat Pemeliharaan:
     if total_kinerja > 90:
         kategori_pemeliharaan = "RUTIN"
     elif 70 <= total_kinerja <= 90:
@@ -1765,6 +2673,8 @@ def compute_condition_assessment(item: Dict[str, Any]) -> Dict[str, Any]:
         "elemen": elemen,
         "kerusakan": kerusakan,
         "keparahan": keparahan,
+        "luas_total": round(luas_total, 2),
+        "persentase_kerusakan": persentase_kerusakan,
         "nilai_awal": nilai_awal,
         "desc_fisik": desc_fisik,
         "desc_fungsi": desc_fungsi,
@@ -1773,11 +2683,11 @@ def compute_condition_assessment(item: Dict[str, Any]) -> Dict[str, Any]:
         "baik_f": baik_f,
         "cukup_f": cukup_f,
         "rusak_f": rusak_f,
-        "nilai_kondisi_f": nilai_kondisi_f,
+        "nilai_kondisi_f": skor_fisik,
         "baik_fn": baik_fn,
         "cukup_fn": cukup_fn,
         "rusak_fn": rusak_fn,
-        "nilai_kondisi_fn": nilai_kondisi_fn,
+        "nilai_kondisi_fn": skor_fungsi,
         "subtotal": subtotal,
         "kinerja_f": kinerja_f,
         "kinerja_fn": kinerja_fn,
@@ -1920,377 +2830,6 @@ class AIVisualAnnotator:
         return out_buf.getvalue()
 
 
-class ExcelReportGenerator:
-    """Generator file Microsoft Excel (.xlsx) dengan tabel penilaian kondisi fisik & fungsi sesuai standar IKBG."""
-
-    @classmethod
-    def generate_excel_report(cls, data_list: List[Dict[str, Any]], title_doc: str = "Laporan Penilaian Kondisi") -> bytes:
-        wb = openpyxl.Workbook()
-
-        thin_border = XlsBorder(
-            left=XlsSide(style='thin', color='000000'),
-            right=XlsSide(style='thin', color='000000'),
-            top=XlsSide(style='thin', color='000000'),
-            bottom=XlsSide(style='thin', color='000000')
-        )
-        box_border = XlsBorder(
-            left=XlsSide(style='medium', color='000000'),
-            right=XlsSide(style='medium', color='000000'),
-            top=XlsSide(style='medium', color='000000'),
-            bottom=XlsSide(style='medium', color='000000')
-        )
-        pill_fill = XlsPatternFill(start_color='FDE68A', end_color='FDE68A', fill_type='solid')
-
-        # -----------------------------------------------------------------------------------------
-        # SHEET 1: PENILAIAN KONDISI (IKBG) SESUAI GAMBAR STANDAR TEKNIK SIPIL
-        # -----------------------------------------------------------------------------------------
-        ws1 = wb.active
-        ws1.title = "Penilaian Kondisi (IKBG)"
-        ws1.views.sheetView[0].showGridLines = True
-
-        ws1.column_dimensions['A'].width = 14
-        ws1.column_dimensions['B'].width = 46
-        ws1.column_dimensions['C'].width = 13
-        ws1.column_dimensions['D'].width = 13
-        ws1.column_dimensions['E'].width = 13
-        ws1.column_dimensions['F'].width = 13
-        ws1.column_dimensions['G'].width = 14
-
-        target_item = data_list[0] if data_list else {}
-        nama_gedung = target_item.get("nama_gedung", "Gedung Kuliah Terpadu")
-        lokasi_lantai = target_item.get("lokasi_lantai", "Lantai 2 - Ruang Kuliah 204")
-        surveyor_name = target_item.get("surveyor", "Ahmad Fajar, S.T.")
-
-        ws1.merge_cells("A1:G1")
-        ws1["A1"] = f"FORMULIR PENILAIAN KONDISI BANGUNAN (IKBG) - {str(nama_gedung).upper()}"
-        ws1["A1"].font = XlsFont(bold=True, size=11, color="0F172A")
-        ws1["A1"].alignment = XlsAlignment(horizontal='center', vertical='center')
-
-        ws1.merge_cells("A2:G2")
-        ws1["A2"] = f"Lokasi: {lokasi_lantai} | Surveyor: {surveyor_name} | Tanggal: {datetime.now().strftime('%d/%m/%Y')}"
-        ws1["A2"].font = XlsFont(size=9, italic=True, color="334155")
-        ws1["A2"].alignment = XlsAlignment(horizontal='center', vertical='center')
-
-        current_row = 4
-
-        for idx, item in enumerate(data_list, start=1):
-            eval_data = compute_condition_assessment(item)
-
-            if len(data_list) > 1:
-                ws1.merge_cells(start_row=current_row, start_column=1, end_row=current_row, end_column=7)
-                title_cell = ws1.cell(row=current_row, column=1, value=f"KOMPONEN BANGUNAN #{idx}: {item.get('elemen_gedung', 'Komponen').upper()}")
-                title_cell.font = XlsFont(bold=True, size=11, color="1E293B")
-                title_cell.alignment = XlsAlignment(horizontal='left', vertical='center')
-                current_row += 1
-
-            # 1. Tabel Header Kondisi Fisik
-            r_fisik = current_row
-            ws1.merge_cells(start_row=r_fisik, start_column=1, end_row=r_fisik+1, end_column=1)
-            c = ws1.cell(row=r_fisik, column=1, value="No. Kode\nKomponen")
-            c.font = XlsFont(bold=True, size=9)
-            c.alignment = XlsAlignment(horizontal='center', vertical='center', wrap_text=True)
-
-            ws1.merge_cells(start_row=r_fisik, start_column=2, end_row=r_fisik+1, end_column=2)
-            c = ws1.cell(row=r_fisik, column=2, value="Kondisi Fisik\nKomponen Bangunan Pengambilan")
-            c.font = XlsFont(bold=True, size=9)
-            c.alignment = XlsAlignment(horizontal='center', vertical='center', wrap_text=True)
-
-            ws1.merge_cells(start_row=r_fisik, start_column=3, end_row=r_fisik+1, end_column=3)
-            c = ws1.cell(row=r_fisik, column=3, value="Nilai\nKondisi\nAwal\n(%)")
-            c.font = XlsFont(bold=True, size=9)
-            c.alignment = XlsAlignment(horizontal='center', vertical='center', wrap_text=True)
-
-            ws1.merge_cells(start_row=r_fisik, start_column=4, end_row=r_fisik, end_column=6)
-            c = ws1.cell(row=r_fisik, column=4, value="Kondisi Penilaian")
-            c.font = XlsFont(bold=True, size=9)
-            c.alignment = XlsAlignment(horizontal='center', vertical='center')
-
-            c_b = ws1.cell(row=r_fisik+1, column=4, value="Baik\n(%)")
-            c_b.font = XlsFont(bold=True, size=8)
-            c_b.alignment = XlsAlignment(horizontal='center', vertical='center', wrap_text=True)
-            c_b.fill = pill_fill
-
-            c_c = ws1.cell(row=r_fisik+1, column=5, value="Cukup\n(%)")
-            c_c.font = XlsFont(bold=True, size=8)
-            c_c.alignment = XlsAlignment(horizontal='center', vertical='center', wrap_text=True)
-            c_c.fill = pill_fill
-
-            c_r = ws1.cell(row=r_fisik+1, column=6, value="Rusak\n(%)")
-            c_r.font = XlsFont(bold=True, size=8)
-            c_r.alignment = XlsAlignment(horizontal='center', vertical='center', wrap_text=True)
-            c_r.fill = pill_fill
-
-            ws1.cell(row=r_fisik+2, column=4, value="79.5-100%").alignment = XlsAlignment(horizontal='center', vertical='center')
-            ws1.cell(row=r_fisik+2, column=4).font = XlsFont(size=8)
-            ws1.cell(row=r_fisik+2, column=5, value="49.5-79.49%").alignment = XlsAlignment(horizontal='center', vertical='center')
-            ws1.cell(row=r_fisik+2, column=5).font = XlsFont(size=8)
-            ws1.cell(row=r_fisik+2, column=6, value="0-49.49%").alignment = XlsAlignment(horizontal='center', vertical='center')
-            ws1.cell(row=r_fisik+2, column=6).font = XlsFont(size=8)
-
-            ws1.merge_cells(start_row=r_fisik, start_column=7, end_row=r_fisik+1, end_column=7)
-            c = ws1.cell(row=r_fisik, column=7, value="Nilai Kondisi")
-            c.font = XlsFont(bold=True, size=9)
-            c.alignment = XlsAlignment(horizontal='center', vertical='center')
-
-            c = ws1.cell(row=r_fisik+2, column=7, value="(3) x (4) /100")
-            c.font = XlsFont(size=8)
-            c.alignment = XlsAlignment(horizontal='center', vertical='center')
-
-            # Baris Penomoran Kolom
-            nums = ["(1)", "(2)", "(3)", "(4)", "(5)", "(6)", "(7)"]
-            for col_i, num in enumerate(nums, start=1):
-                cell_n = ws1.cell(row=r_fisik+3, column=col_i, value=num)
-                cell_n.font = XlsFont(size=8)
-                cell_n.alignment = XlsAlignment(horizontal='center', vertical='center')
-
-            # Baris Data Fisik
-            ws1.cell(row=r_fisik+4, column=1, value="(1)").alignment = XlsAlignment(horizontal='center', vertical='center')
-            ws1.cell(row=r_fisik+4, column=2, value=eval_data["desc_fisik"]).alignment = XlsAlignment(horizontal='left', vertical='center', wrap_text=True)
-            ws1.cell(row=r_fisik+4, column=3, value=100).alignment = XlsAlignment(horizontal='center', vertical='center')
-            ws1.cell(row=r_fisik+4, column=4, value=eval_data["baik_f"]).alignment = XlsAlignment(horizontal='center', vertical='center')
-            ws1.cell(row=r_fisik+4, column=5, value=eval_data["cukup_f"]).alignment = XlsAlignment(horizontal='center', vertical='center')
-            ws1.cell(row=r_fisik+4, column=6, value=eval_data["rusak_f"]).alignment = XlsAlignment(horizontal='center', vertical='center')
-            ws1.cell(row=r_fisik+4, column=7, value=eval_data["nilai_kondisi_f"]).alignment = XlsAlignment(horizontal='center', vertical='center')
-
-            for r_x in range(r_fisik, r_fisik+5):
-                for c_x in range(1, 8):
-                    ws1.cell(row=r_x, column=c_x).border = thin_border
-
-            # 2. Tabel Header Kondisi Fungsi
-            r_fungsi = r_fisik + 5
-            ws1.merge_cells(start_row=r_fungsi, start_column=1, end_row=r_fungsi+1, end_column=1)
-            c = ws1.cell(row=r_fungsi, column=1, value="No. Kode\nKomponen")
-            c.font = XlsFont(bold=True, size=9)
-            c.alignment = XlsAlignment(horizontal='center', vertical='center', wrap_text=True)
-
-            ws1.merge_cells(start_row=r_fungsi, start_column=2, end_row=r_fungsi+1, end_column=2)
-            c = ws1.cell(row=r_fungsi, column=2, value="Kondisi Fungsi\nKomponen Bangunan Pengambilan")
-            c.font = XlsFont(bold=True, size=9)
-            c.alignment = XlsAlignment(horizontal='center', vertical='center', wrap_text=True)
-
-            ws1.merge_cells(start_row=r_fungsi, start_column=3, end_row=r_fungsi+1, end_column=3)
-            c = ws1.cell(row=r_fungsi, column=3, value="Nilai\nKondisi\nAwal\n(%)")
-            c.font = XlsFont(bold=True, size=9)
-            c.alignment = XlsAlignment(horizontal='center', vertical='center', wrap_text=True)
-
-            ws1.merge_cells(start_row=r_fungsi, start_column=4, end_row=r_fungsi, end_column=6)
-            c = ws1.cell(row=r_fungsi, column=4, value="Kondisi Penilaian")
-            c.font = XlsFont(bold=True, size=9)
-            c.alignment = XlsAlignment(horizontal='center', vertical='center')
-
-            c_b = ws1.cell(row=r_fungsi+1, column=4, value="Baik\n(%)")
-            c_b.font = XlsFont(bold=True, size=8)
-            c_b.alignment = XlsAlignment(horizontal='center', vertical='center', wrap_text=True)
-            c_b.fill = pill_fill
-
-            c_c = ws1.cell(row=r_fungsi+1, column=5, value="Cukup\n(%)")
-            c_c.font = XlsFont(bold=True, size=8)
-            c_c.alignment = XlsAlignment(horizontal='center', vertical='center', wrap_text=True)
-            c_c.fill = pill_fill
-
-            c_r = ws1.cell(row=r_fungsi+1, column=6, value="Rusak\n(%)")
-            c_r.font = XlsFont(bold=True, size=8)
-            c_r.alignment = XlsAlignment(horizontal='center', vertical='center', wrap_text=True)
-            c_r.fill = pill_fill
-
-            ws1.cell(row=r_fungsi+2, column=4, value="79.5-100%").alignment = XlsAlignment(horizontal='center', vertical='center')
-            ws1.cell(row=r_fungsi+2, column=4).font = XlsFont(size=8)
-            ws1.cell(row=r_fungsi+2, column=5, value="49.5-79.49%").alignment = XlsAlignment(horizontal='center', vertical='center')
-            ws1.cell(row=r_fungsi+2, column=5).font = XlsFont(size=8)
-            ws1.cell(row=r_fungsi+2, column=6, value="0-49.49%").alignment = XlsAlignment(horizontal='center', vertical='center')
-            ws1.cell(row=r_fungsi+2, column=6).font = XlsFont(size=8)
-
-            ws1.merge_cells(start_row=r_fungsi, start_column=7, end_row=r_fungsi+1, end_column=7)
-            c = ws1.cell(row=r_fungsi, column=7, value="Nilai Kondisi")
-            c.font = XlsFont(bold=True, size=9)
-            c.alignment = XlsAlignment(horizontal='center', vertical='center')
-
-            c = ws1.cell(row=r_fungsi+2, column=7, value="(3) x (4) /100")
-            c.font = XlsFont(size=8)
-            c.alignment = XlsAlignment(horizontal='center', vertical='center')
-
-            for col_i, num in enumerate(nums, start=1):
-                cell_n = ws1.cell(row=r_fungsi+3, column=col_i, value=num)
-                cell_n.font = XlsFont(size=8)
-                cell_n.alignment = XlsAlignment(horizontal='center', vertical='center')
-
-            # Baris Data Fungsi
-            ws1.cell(row=r_fungsi+4, column=1, value="(1)").alignment = XlsAlignment(horizontal='center', vertical='center')
-            ws1.cell(row=r_fungsi+4, column=2, value=eval_data["desc_fungsi"]).alignment = XlsAlignment(horizontal='left', vertical='center', wrap_text=True)
-            ws1.cell(row=r_fungsi+4, column=3, value=100).alignment = XlsAlignment(horizontal='center', vertical='center')
-            ws1.cell(row=r_fungsi+4, column=4, value=eval_data["baik_fn"]).alignment = XlsAlignment(horizontal='center', vertical='center')
-            ws1.cell(row=r_fungsi+4, column=5, value=eval_data["cukup_fn"]).alignment = XlsAlignment(horizontal='center', vertical='center')
-            ws1.cell(row=r_fungsi+4, column=6, value=eval_data["rusak_fn"]).alignment = XlsAlignment(horizontal='center', vertical='center')
-            ws1.cell(row=r_fungsi+4, column=7, value=eval_data["nilai_kondisi_fn"]).alignment = XlsAlignment(horizontal='center', vertical='center')
-
-            for r_x in range(r_fungsi, r_fungsi+5):
-                for c_x in range(1, 8):
-                    ws1.cell(row=r_x, column=c_x).border = thin_border
-
-            # 3. Baris SUB TOTAL
-            r_sub = r_fungsi + 5
-            ws1.merge_cells(start_row=r_sub, start_column=1, end_row=r_sub, end_column=6)
-            c_sub = ws1.cell(row=r_sub, column=1, value="SUB TOTAL")
-            c_sub.font = XlsFont(bold=True, size=9)
-            c_sub.alignment = XlsAlignment(horizontal='left', vertical='center')
-
-            c_sub_val = ws1.cell(row=r_sub, column=7, value=eval_data["subtotal"])
-            c_sub_val.font = XlsFont(bold=True, size=9)
-            c_sub_val.alignment = XlsAlignment(horizontal='center', vertical='center')
-
-            for c_x in range(1, 8):
-                ws1.cell(row=r_sub, column=c_x).border = thin_border
-
-            # 4. Keterangan Standar Formula
-            r_ket = r_sub + 2
-            ws1.cell(row=r_ket, column=1, value="Keterangan :").font = XlsFont(bold=True, size=9)
-            ws1.cell(row=r_ket+1, column=1, value="Rutin: µku = >90;  Preventif: µku = 70 - 90;  Korektif: µku = 50 - 70;  Rehabilitatif: µku = <50").font = XlsFont(size=8.5)
-
-            # 5. Tabel Bobot & Kinerja (Fisik 50%, Fungsi 50%)
-            r_b = r_ket + 3
-            headers_bobot = ["Penilaian", "Bobot", "Penilaian", "Kinerja"]
-            for col_i, h_txt in enumerate(headers_bobot, start=1):
-                cell_h = ws1.cell(row=r_b, column=col_i, value=h_txt)
-                cell_h.font = XlsFont(bold=True, size=9)
-                cell_h.alignment = XlsAlignment(horizontal='center', vertical='center')
-                cell_h.border = thin_border
-
-            # Fisik
-            ws1.cell(row=r_b+1, column=1, value="Fisik").alignment = XlsAlignment(horizontal='center', vertical='center')
-            ws1.cell(row=r_b+1, column=2, value="50%").alignment = XlsAlignment(horizontal='center', vertical='center')
-            ws1.cell(row=r_b+1, column=3, value=eval_data["nilai_kondisi_f"]).alignment = XlsAlignment(horizontal='center', vertical='center')
-            ws1.cell(row=r_b+1, column=4, value=eval_data["kinerja_f"]).alignment = XlsAlignment(horizontal='center', vertical='center')
-
-            # Fungsi
-            ws1.cell(row=r_b+2, column=1, value="Fungsi").alignment = XlsAlignment(horizontal='center', vertical='center')
-            ws1.cell(row=r_b+2, column=2, value="50%").alignment = XlsAlignment(horizontal='center', vertical='center')
-            ws1.cell(row=r_b+2, column=3, value=eval_data["nilai_kondisi_fn"]).alignment = XlsAlignment(horizontal='center', vertical='center')
-            ws1.cell(row=r_b+2, column=4, value=eval_data["kinerja_fn"]).alignment = XlsAlignment(horizontal='center', vertical='center')
-
-            for r_x in [r_b+1, r_b+2]:
-                for c_x in range(1, 5):
-                    ws1.cell(row=r_x, column=c_x).border = thin_border
-
-            # Total Kinerja
-            cell_tot = ws1.cell(row=r_b+3, column=4, value=eval_data["total_kinerja"])
-            cell_tot.font = XlsFont(bold=True, size=9)
-            cell_tot.alignment = XlsAlignment(horizontal='center', vertical='center')
-            cell_tot.border = thin_border
-
-            # 6. Tabel NILAI KONDISI (Kotak Checkbox)
-            r_nk = r_b + 5
-            ws1.merge_cells(start_row=r_nk, start_column=1, end_row=r_nk, end_column=3)
-            cell_nk = ws1.cell(row=r_nk, column=1, value="NILAI KONDISI")
-            cell_nk.font = XlsFont(bold=True, size=9)
-            cell_nk.alignment = XlsAlignment(horizontal='center', vertical='center')
-            for c_x in range(1, 4):
-                ws1.cell(row=r_nk, column=c_x).border = thin_border
-
-            status_list = [
-                ("RUTIN", eval_data["is_rutin"]),
-                ("PREVENTIF", eval_data["is_preventif"]),
-                ("KOREKTIF", eval_data["is_korektif"]),
-                ("REHABILITATIF", eval_data["is_rehabilitatif"])
-            ]
-
-            for s_idx, (s_name, is_sel) in enumerate(status_list, start=1):
-                curr_s_row = r_nk + s_idx
-                # Checkbox box
-                c_box = ws1.cell(row=curr_s_row, column=1, value="X" if is_sel else "-")
-                c_box.font = XlsFont(bold=True, size=9)
-                c_box.alignment = XlsAlignment(horizontal='center', vertical='center')
-                c_box.border = box_border if is_sel else thin_border
-
-                # Status label
-                ws1.merge_cells(start_row=curr_s_row, start_column=2, end_row=curr_s_row, end_column=3)
-                c_lbl = ws1.cell(row=curr_s_row, column=2, value=s_name)
-                c_lbl.font = XlsFont(bold=is_sel, size=9)
-                c_lbl.alignment = XlsAlignment(horizontal='left', vertical='center')
-
-            current_row = r_nk + 6
-
-        # -----------------------------------------------------------------------------------------
-        # SHEET 2: REKAPITULASI RAB STANDAR AHSP JAWA TENGAH 2023
-        # -----------------------------------------------------------------------------------------
-        ws2 = wb.create_sheet(title="Rekapitulasi RAB Jateng")
-        ws2.views.sheetView[0].showGridLines = True
-
-        ws2.merge_cells("A1:J1")
-        ws2["A1"] = "RENCANA ANGGARAN BIAYA (RAB) PEMELIHARAAN BANGUNAN GEDUNG"
-        ws2["A1"].font = XlsFont(bold=True, size=12)
-        ws2["A1"].alignment = XlsAlignment(horizontal='center', vertical='center')
-
-        ws2.merge_cells("A2:J2")
-        ws2["A2"] = "Standar AHSP Dinas Bina Marga & Cipta Karya Provinsi Jawa Tengah Tahun 2023"
-        ws2["A2"].font = XlsFont(size=9, italic=True)
-        ws2["A2"].alignment = XlsAlignment(horizontal='center', vertical='center')
-
-        ws2.merge_cells("A3:J3")
-        ws2["A3"] = f"Objek: {nama_gedung} | Lokasi: {lokasi_lantai} | Surveyor: {surveyor_name}"
-        ws2["A3"].font = XlsFont(bold=True, size=9, color="334155")
-        ws2["A3"].alignment = XlsAlignment(horizontal='center', vertical='center')
-
-        rab_headers = [
-            "No", "Tgl Inspeksi", "Elemen Gedung", "Jenis Kerusakan",
-            "Kode AHSP", "Volume", "Sat", "Harga Satuan (Rp)", "Total Biaya (Rp)", "Kategori Pemeliharaan"
-        ]
-
-        rab_widths = [6, 18, 24, 28, 16, 10, 8, 18, 18, 18]
-        for idx_w, w_val in enumerate(rab_widths, start=1):
-            col_letter = get_column_letter(idx_w)
-            ws2.column_dimensions[col_letter].width = w_val
-
-        for c_idx, h_name in enumerate(rab_headers, start=1):
-            c_cell = ws2.cell(row=5, column=c_idx, value=h_name)
-            c_cell.font = XlsFont(bold=True, size=9, color="FFFFFF")
-            c_cell.fill = XlsPatternFill(start_color="1E293B", end_color="1E293B", fill_type="solid")
-            c_cell.alignment = XlsAlignment(horizontal='center', vertical='center')
-            c_cell.border = thin_border
-
-        grand_total_biaya = 0
-        r_start = 6
-        for i_row, item in enumerate(data_list, start=1):
-            curr_r = r_start + i_row - 1
-            tot = item.get("total_biaya", 0)
-            grand_total_biaya += tot
-            eval_data = compute_condition_assessment(item)
-
-            ws2.cell(row=curr_r, column=1, value=i_row).alignment = XlsAlignment(horizontal='center')
-            ws2.cell(row=curr_r, column=2, value=str(item.get("tanggal", ""))[:16]).alignment = XlsAlignment(horizontal='center')
-            ws2.cell(row=curr_r, column=3, value=item.get("elemen_gedung", "")).alignment = XlsAlignment(horizontal='left')
-            ws2.cell(row=curr_r, column=4, value=item.get("jenis_kerusakan", "")).alignment = XlsAlignment(horizontal='left')
-            ws2.cell(row=curr_r, column=5, value=item.get("kode_ahsp", "")).alignment = XlsAlignment(horizontal='center')
-            ws2.cell(row=curr_r, column=6, value=float(item.get("volume", 0))).alignment = XlsAlignment(horizontal='right')
-            ws2.cell(row=curr_r, column=7, value=item.get("satuan", "")).alignment = XlsAlignment(horizontal='center')
-            ws2.cell(row=curr_r, column=8, value=int(item.get("harga_satuan", 0))).number_format = "#,##0"
-            ws2.cell(row=curr_r, column=9, value=int(tot)).number_format = "#,##0"
-            ws2.cell(row=curr_r, column=10, value=eval_data["kategori_pemeliharaan"]).alignment = XlsAlignment(horizontal='center')
-
-            for c_x in range(1, 11):
-                ws2.cell(row=curr_r, column=c_x).border = thin_border
-
-        # Baris Grand Total
-        r_tot = r_start + len(data_list)
-        ws2.merge_cells(start_row=r_tot, start_column=1, end_row=r_tot, end_column=8)
-        c_gtot = ws2.cell(row=r_tot, column=1, value="GRAND TOTAL ESTIMASI BIAYA PEMELIHARAAN (RAB)")
-        c_gtot.font = XlsFont(bold=True, size=9)
-        c_gtot.alignment = XlsAlignment(horizontal='center', vertical='center')
-
-        c_gtot_val = ws2.cell(row=r_tot, column=9, value=grand_total_biaya)
-        c_gtot_val.font = XlsFont(bold=True, size=9)
-        c_gtot_val.number_format = "#,##0"
-        c_gtot_val.alignment = XlsAlignment(horizontal='right', vertical='center')
-
-        for c_x in range(1, 11):
-            ws2.cell(row=r_tot, column=c_x).border = thin_border
-
-        buffer = io.BytesIO()
-        wb.save(buffer)
-        val = buffer.getvalue()
-        buffer.close()
-        return val
-
-
 class PDFReportGenerator:
     """Generator dokumen PDF laporan resmi pemeliharaan gedung menggunakan ReportLab."""
 
@@ -2381,33 +2920,37 @@ class PDFReportGenerator:
         story.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor('#0F172A'), spaceBefore=2, spaceAfter=6))
 
         # 2. METADATA DOKUMEN INSPEKSI
-        today_str = datetime.now().strftime("%d %B %Y - %H:%M WIB")
         doc_no = f"BA-PBG/JATENG/{datetime.now().strftime('%Y%m%d')}/{len(data_list):03d}"
 
         target_item = data_list[0] if data_list else {}
         nama_gedung = target_item.get("nama_gedung") or "Bangunan Gedung"
         lokasi_lantai = target_item.get("lokasi_lantai") or "-"
         surveyor_name = target_item.get("surveyor") or ""
+        koordinat_lokasi = target_item.get("koordinat_lokasi") or "-"
+        objek_inspeksi = target_item.get("objek_inspeksi") or target_item.get("elemen_gedung") or "-"
+        tanggal_inspeksi = str(target_item.get("tanggal") or datetime.now().strftime("%d %B %Y"))[:22]
 
-        if surveyor_name and surveyor_name not in ["Surveyor Lapangan", "-", ""]:
-            sig_surveyor_text = f"<u>( {surveyor_name} )</u>"
+        if surveyor_name and surveyor_name not in ["Surveyor Lapangan", "Inspektor Lapangan", "-", ""]:
             surveyor_disp = surveyor_name
         else:
-            sig_surveyor_text = "<u>( .................................................. )</u>"
-            surveyor_disp = "Tim Pemeriksa Lapangan"
+            surveyor_disp = "Inspektor Lapangan"
 
         meta_data = [
             [
                 Paragraph("<b>Nomor Dokumen:</b>", body_small_left), Paragraph(doc_no, body_small_left),
-                Paragraph("<b>Tanggal Cetak:</b>", body_small_left), Paragraph(today_str, body_small_left)
+                Paragraph("<b>Tanggal Inspeksi:</b>", body_small_left), Paragraph(tanggal_inspeksi, body_small_left)
             ],
             [
-                Paragraph("<b>Objek Bangunan:</b>", body_small_left), Paragraph(nama_gedung, body_small_left),
-                Paragraph("<b>Lokasi / Lantai:</b>", body_small_left), Paragraph(lokasi_lantai, body_small_left)
+                Paragraph("<b>Nama Bangunan:</b>", body_small_left), Paragraph(nama_gedung, body_small_left),
+                Paragraph("<b>Nama Ruangan:</b>", body_small_left), Paragraph(lokasi_lantai, body_small_left)
             ],
             [
-                Paragraph("<b>Surveyor Lapangan:</b>", body_small_left), Paragraph(surveyor_disp, body_small_left),
-                Paragraph("<b>Acuan Regulasi:</b>", body_small_left), Paragraph("AHSP Dinas PU Jateng 2023 & Permen PUPR 24/2008", body_small_left)
+                Paragraph("<b>Objek Inspeksi:</b>", body_small_left), Paragraph(objek_inspeksi, body_small_left),
+                Paragraph("<b>Nama Inspektor:</b>", body_small_left), Paragraph(surveyor_disp, body_small_left)
+            ],
+            [
+                Paragraph("<b>Koordinat Lokasi:</b>", body_small_left), Paragraph(koordinat_lokasi, body_small_left),
+                Paragraph("<b>Acuan Standar:</b>", body_small_left), Paragraph("AHSP Jateng 2023 & Permen PUPR 24/2008", body_small_left)
             ]
         ]
         meta_table = Table(meta_data, colWidths=[90, 170, 90, 170])
@@ -2421,15 +2964,72 @@ class PDFReportGenerator:
         story.append(meta_table)
         story.append(Spacer(1, 8))
 
-        # -----------------------------------------------------------------------------------------
-        # 3. TABEL PENILAIAN KONDISI FISIK DAN FUNGSI (IKBG) SESUAI GAMBAR STANDAR
-        # -----------------------------------------------------------------------------------------
         target_item = data_list[0] if data_list else {
-            "elemen_gedung": "Komponen Gedung", "jenis_kerusakan": "Retak Permukaan", "tingkat_keparahan": "Sedang"
+            "elemen_gedung": "Komponen Gedung", "jenis_kerusakan": "Kerusakan Permukaan", "tingkat_keparahan": "Ringan"
         }
         eval_m = compute_condition_assessment(target_item)
 
-        story.append(Paragraph("1. FORMULIR PENILAIAN KONDISI FISIK DAN FUNGSI KOMPONEN BANGUNAN (IKBG)", doc_header_style))
+        # -----------------------------------------------------------------------------------------
+        # 3. FOTO DOKUMENTASI KERUSAKAN (URUTAN PERTAMA SESUAI REVISI: FOTO DULU)
+        # -----------------------------------------------------------------------------------------
+        sec_offset = 0
+        if annotated_image_bytes:
+            sec_offset = 1
+            story.append(Paragraph("1. DOKUMENTASI FOTO KERUSAKAN BANGUNAN", doc_header_style))
+            try:
+                img_io = io.BytesIO(annotated_image_bytes)
+                pil_temp = Image.open(img_io)
+                orig_w, orig_h = pil_temp.size
+
+                target_w = 380.0
+                target_h = target_w * (orig_h / orig_w)
+                if target_h > 250.0:
+                    target_h = 250.0
+                    target_w = target_h * (orig_w / orig_h)
+
+                img_io.seek(0)
+                rl_img = RLImage(img_io, width=target_w, height=target_h)
+
+                meta_lampiran = [
+                    [
+                        Paragraph(f"<b>Elemen Bangunan:</b> {target_item.get('elemen_gedung', '-')}", body_small_left),
+                        Paragraph(f"<b>Jenis Kerusakan:</b> {target_item.get('jenis_kerusakan', '-')}", body_small_left)
+                    ],
+                    [
+                        Paragraph(f"<b>Kode AHSP:</b> {target_item.get('kode_ahsp', '-')}", body_small_left),
+                        Paragraph(f"<b>Prosentase & Keparahan:</b> {eval_m['persentase_kerusakan']:.1f}% ({str(eval_m['keparahan']).upper()})", body_small_left)
+                    ]
+                ]
+                tbl_lampiran = Table(meta_lampiran, colWidths=[260, 260])
+                tbl_lampiran.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#F8FAFC')),
+                    ('BOX', (0, 0), (-1, -1), 0.5, colors.HexColor('#CBD5E1')),
+                    ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#E2E8F0')),
+                    ('TOPPADDING', (0, 0), (-1, -1), 3),
+                    ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+                ]))
+
+                story.append(KeepTogether([
+                    Table([[rl_img]], colWidths=[520], style=[
+                        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                        ('BOX', (0, 0), (-1, -1), 0.8, colors.HexColor('#CBD5E1')),
+                        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#F8FAFC')),
+                        ('TOPPADDING', (0, 0), (-1, -1), 5),
+                        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+                    ]),
+                    Spacer(1, 4),
+                    tbl_lampiran
+                ]))
+                story.append(Spacer(1, 8))
+            except Exception:
+                sec_offset = 0
+
+        # -----------------------------------------------------------------------------------------
+        # 4. FORMULIR PROSENTASE PENILAIAN KONDISI FISIK DAN FUNGSI (IKBG)
+        # -----------------------------------------------------------------------------------------
+        no_ikbg = 1 + sec_offset
+        story.append(Paragraph(f"{no_ikbg}. FORMULIR PROSENTASE PENILAIAN KONDISI FISIK DAN FUNGSI (IKBG)", doc_header_style))
 
         col_w_assessment = [45, 230, 48, 50, 50, 50, 50]
         data_assessment_table = [
@@ -2573,9 +3173,10 @@ class PDFReportGenerator:
         story.append(Spacer(1, 10))
 
         # -----------------------------------------------------------------------------------------
-        # 4. TABEL REKAPITULASI RAB STANDAR AHSP JAWA TENGAH 2023
+        # 5. TABEL REKAPITULASI RENCANA ANGGARAN BIAYA (RAB) & TOTAL ESTIMASI ANGGARAN
         # -----------------------------------------------------------------------------------------
-        story.append(Paragraph("2. REKAPITULASI HASIL ESTIMASI ANGGARAN BIAYA (RAB) AHSP JATENG 2023", doc_header_style))
+        no_rab = 2 + sec_offset
+        story.append(Paragraph(f"{no_rab}. REKAPITULASI RENCANA ANGGARAN BIAYA (RAB) & TOTAL ESTIMASI ANGGARAN", doc_header_style))
 
         headers_rab = [
             Paragraph("<b>No</b>", body_small_bold),
@@ -2632,44 +3233,92 @@ class PDFReportGenerator:
         story.append(Spacer(1, 6))
 
         terbilang_teks = angka_ke_terbilang(grand_total).strip() + " Rupiah"
-        story.append(Paragraph(f"<b>Terbilang:</b> <i>{terbilang_teks}</i>", body_small_left))
+        story.append(Paragraph(f"<b>Total Estimasi Anggaran: {format_rupiah(grand_total)}</b> (<i>Terbilang: {terbilang_teks}</i>)", body_small_left))
         story.append(Spacer(1, 8))
 
+        # Jika inspeksi tunggal, tampilkan rincian AHSP detail per bahan dan tenaga kerja
+        if len(data_list) == 1:
+            bd_pdf = AHSPKnowledgeBase.compute_material_breakdown(
+                target_item.get("kode_ahsp", "A.4.4.1.25.JT"),
+                float(target_item.get("volume", 1.0))
+            )
+            detail_rows = [
+                [
+                    Paragraph("<b>Komponen Bahan / Tenaga Kerja</b>", body_small_bold),
+                    Paragraph("<b>Koef</b>", body_small_bold),
+                    Paragraph("<b>Kebutuhan</b>", body_small_bold),
+                    Paragraph("<b>Harga Satuan</b>", body_small_bold),
+                    Paragraph("<b>Jumlah Biaya</b>", body_small_bold),
+                ]
+            ]
+            for u_r in bd_pdf["upah_rows"]:
+                detail_rows.append([
+                    Paragraph(f"[Upah] {u_r['Unsur Tenaga Kerja']}", body_small_left),
+                    Paragraph(u_r["Koefisien"], body_small),
+                    Paragraph(u_r["Kebutuhan Riil"], body_small),
+                    Paragraph(format_rupiah(u_r["Harga Satuan"]), body_small),
+                    Paragraph(format_rupiah(u_r["Jumlah Biaya"]), body_small),
+                ])
+            for b_r in bd_pdf["bahan_rows"]:
+                detail_rows.append([
+                    Paragraph(f"[Bahan] {b_r['Nama Bahan / Material']}", body_small_left),
+                    Paragraph(b_r["Koefisien"], body_small),
+                    Paragraph(b_r["Kebutuhan Riil"], body_small),
+                    Paragraph(format_rupiah(b_r["Harga Satuan"]), body_small),
+                    Paragraph(format_rupiah(b_r["Jumlah Biaya"]), body_small),
+                ])
+            detail_rows.append([
+                Paragraph("<b>Overhead & Profit (15%)</b>", body_small_left),
+                Paragraph("-", body_small),
+                Paragraph("-", body_small),
+                Paragraph("-", body_small),
+                Paragraph(format_rupiah(bd_pdf["overhead_15"]), body_small_bold),
+            ])
+            t_detail_ahsp = Table(detail_rows, colWidths=[215, 50, 75, 85, 98])
+            t_detail_ahsp.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#334155')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('BOX', (0, 0), (-1, -1), 0.5, colors.HexColor('#94A3B8')),
+                ('INNERGRID', (0, 0), (-1, -1), 0.4, colors.HexColor('#CBD5E1')),
+                ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#F1F5F9')),
+                ('TOPPADDING', (0, 0), (-1, -1), 2.5),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 2.5),
+            ]))
+            story.append(Paragraph("<b>Rincian Kebutuhan Bahan & Tenaga Kerja per Item (AHSP):</b>", body_small_left))
+            story.append(Spacer(1, 3))
+            story.append(t_detail_ahsp)
+            story.append(Spacer(1, 8))
+
         # -----------------------------------------------------------------------------------------
-        # 5. CATATAN REKOMENDASI TEKNIS & LEMBAR PENGESAHAN TANDA TANGAN
+        # 6. LANGKAH-LANGKAH PERBAIKAN & REKOMENDASI TEKNIS
         # -----------------------------------------------------------------------------------------
-        story.append(Paragraph("3. CATATAN REKOMENDASI TEKNIS & PROSEDUR PERBAIKAN", doc_header_style))
+        no_rek = 3 + sec_offset
+        story.append(Paragraph(f"{no_rek}. LANGKAH-LANGKAH PERBAIKAN & REKOMENDASI TEKNIS", doc_header_style))
+        if len(data_list) == 1 and target_item.get("langkah_kerja"):
+            for s_idx, step_txt in enumerate(target_item.get("langkah_kerja", []), start=1):
+                story.append(Paragraph(f"<b>Tahap {s_idx}:</b> {step_txt}", body_small_left))
+                story.append(Spacer(1, 1.5))
+            story.append(Spacer(1, 3))
         for idx_rc, r_row in enumerate(data_list[:2], start=1):
-            recom_text = f"<b>{idx_rc}. {r_row.get('elemen_gedung')}:</b> {r_row.get('rekomendasi', '-')}"
+            recom_text = f"<b>Catatan Teknis ({r_row.get('elemen_gedung')}):</b> {r_row.get('rekomendasi', '-')}"
             story.append(Paragraph(recom_text, body_small_left))
             story.append(Spacer(1, 2))
 
-        story.append(Spacer(1, 12))
+        story.append(Spacer(1, 14))
 
         if not signer_info:
             signer_info = {}
 
-        # 1. Surveyor / Penguji Lapangan
+        # Hanya 2 Penandatangan sesuai Revisi: Dibuat Oleh & Disetujui Oleh
         s_nama = signer_info.get("surveyor_name") or surveyor_name or ""
         s_nip = signer_info.get("surveyor_nip") or ""
-        if s_nama and s_nama not in ["Surveyor Lapangan", "-", ""]:
+        if s_nama and s_nama not in ["Surveyor Lapangan", "Inspektor Lapangan", "-", ""]:
             sig_s_nama = f"<b><u>{s_nama}</u></b>"
-            sig_s_nip = f"NIM/NIP. {s_nip}" if s_nip else "NIM/NIP. ....................."
+            sig_s_nip = f"NIP/ID. {s_nip}" if s_nip else "NIP/ID. ....................."
         else:
             sig_s_nama = "<u>( .................................................. )</u>"
-            sig_s_nip = "NIM/NIP."
+            sig_s_nip = "NIP/ID."
 
-        # 2. Dosen Pembimbing / Penguji
-        d_nama = signer_info.get("dosen_name") or ""
-        d_nip = signer_info.get("dosen_nip") or ""
-        if d_nama:
-            sig_d_nama = f"<b><u>{d_nama}</u></b>"
-            sig_d_nip = f"NIP. {d_nip}" if d_nip else "NIP. ....................."
-        else:
-            sig_d_nama = "<u>( .................................................. )</u>"
-            sig_d_nip = "NIP."
-
-        # 3. Pengelola Gedung / PPK
         p_nama = signer_info.get("ppk_name") or ""
         p_nip = signer_info.get("ppk_nip") or ""
         if p_nama:
@@ -2682,86 +3331,14 @@ class PDFReportGenerator:
         story.append(KeepTogether([
             Table([
                 [
-                    Paragraph(f"Dibuat Oleh,<br/><b>Surveyor / Penguji Lapangan</b><br/><br/><br/><br/>{sig_s_nama}<br/>{sig_s_nip}", body_small),
-                    Paragraph(f"Mengetahui,<br/><b>Dosen Pembimbing / Penguji</b><br/><br/><br/><br/>{sig_d_nama}<br/>{sig_d_nip}", body_small),
+                    Paragraph(f"Dibuat Oleh,<br/><b>Inspektor Lapangan</b><br/><br/><br/><br/>{sig_s_nama}<br/>{sig_s_nip}", body_small),
                     Paragraph(f"Disetujui Oleh,<br/><b>Pengelola Gedung / PPK</b><br/><br/><br/><br/>{sig_p_nama}<br/>{sig_p_nip}", body_small)
                 ]
-            ], colWidths=[170, 175, 175], style=[
+            ], colWidths=[260, 260], style=[
                 ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
                 ('VALIGN', (0, 0), (-1, -1), 'TOP'),
             ])
         ]))
-
-        # -----------------------------------------------------------------------------------------
-        # 6. LAMPIRAN DOKUMENTASI VISUAL KERUSAKAN BERBASIS AI
-        # -----------------------------------------------------------------------------------------
-        if annotated_image_bytes:
-            story.append(PageBreak())
-            story.append(Paragraph("PEMERINTAH PROVINSI JAWA TENGAH", kop_title_style))
-            story.append(Paragraph("DINAS PEKERJAAN UMUM BINA MARGA DAN CIPTA KARYA", kop_title_style))
-            story.append(Paragraph("LAMPIRAN DOKUMENTASI VISUAL KERUSAKAN BANGUNAN GEDUNG (COMPUTER VISION AI)", kop_sub_style))
-            story.append(Spacer(1, 4))
-            story.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor('#0F172A'), spaceBefore=2, spaceAfter=8))
-
-            story.append(Paragraph("<b>DOKUMENTASI HASIL PEMINDAIAN VISUAL BERBASIS AI AGENT</b>", doc_header_style))
-            story.append(Paragraph(
-                "Berikut adalah bukti citra dokumentasi inspeksi visual lapangan yang telah diproses oleh modul deteksi AI dengan "
-                "anotasi kotak pembatas (bounding box), nilai akurasi keyakinan (confidence score), serta rujukan kode AHSP Cipta Karya Jawa Tengah.",
-                body_small_left
-            ))
-            story.append(Spacer(1, 8))
-
-            try:
-                img_io = io.BytesIO(annotated_image_bytes)
-                pil_temp = Image.open(img_io)
-                orig_w, orig_h = pil_temp.size
-
-                target_w = 420.0
-                target_h = target_w * (orig_h / orig_w)
-                if target_h > 330.0:
-                    target_h = 330.0
-                    target_w = target_h * (orig_w / orig_h)
-
-                img_io.seek(0)
-                rl_img = RLImage(img_io, width=target_w, height=target_h)
-
-                meta_lampiran = [
-                    [
-                        Paragraph(f"<b>Objek Bangunan:</b> {nama_gedung}", body_small_left),
-                        Paragraph(f"<b>Lokasi / Ruang:</b> {lokasi_lantai}", body_small_left)
-                    ],
-                    [
-                        Paragraph(f"<b>Elemen Gedung:</b> {target_item.get('elemen_gedung', '-')}", body_small_left),
-                        Paragraph(f"<b>Jenis Kerusakan:</b> {target_item.get('jenis_kerusakan', '-')}", body_small_left)
-                    ],
-                    [
-                        Paragraph(f"<b>Kode Analisa Satuan:</b> {target_item.get('kode_ahsp', '-')}", body_small_left),
-                        Paragraph(f"<b>Tingkat Keparahan:</b> {str(target_item.get('tingkat_keparahan', 'Sedang')).upper()}", body_small_left)
-                    ]
-                ]
-                tbl_lampiran = Table(meta_lampiran, colWidths=[260, 260])
-                tbl_lampiran.setStyle(TableStyle([
-                    ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#F8FAFC')),
-                    ('BOX', (0, 0), (-1, -1), 0.5, colors.HexColor('#CBD5E1')),
-                    ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#E2E8F0')),
-                    ('TOPPADDING', (0, 0), (-1, -1), 3),
-                    ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
-                ]))
-
-                story.append(KeepTogether([
-                    Table([[rl_img]], colWidths=[520], style=[
-                        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                        ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#CBD5E1')),
-                        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#F8FAFC')),
-                        ('TOPPADDING', (0, 0), (-1, -1), 6),
-                        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-                    ]),
-                    Spacer(1, 6),
-                    tbl_lampiran
-                ]))
-            except Exception:
-                pass
 
         doc.build(story)
         pdf_bytes = buffer.getvalue()
@@ -2781,6 +3358,27 @@ if "annotated_img_bytes" not in st.session_state:
 if "uploaded_img_bytes" not in st.session_state:
     st.session_state.uploaded_img_bytes = None
 
+@st.cache_data(ttl=3600, show_spinner=False)
+def get_auto_coordinates() -> str:
+    """Mendapatkan koordinat lokasi perkiraan otomatis via geolokasi jaringan dengan fallback Semarang."""
+    endpoints = [
+        ("http://ip-api.com/json/?fields=status,lat,lon,city,regionName", "lat", "lon"),
+        ("https://ipapi.co/json/", "latitude", "longitude"),
+    ]
+    for url, lat_k, lon_k in endpoints:
+        try:
+            resp = requests.get(url, timeout=2.0)
+            if resp.status_code == 200:
+                d = resp.json()
+                lat = d.get(lat_k)
+                lon = d.get(lon_k)
+                if lat is not None and lon is not None:
+                    return f"{float(lat):.6f}, {float(lon):.6f}"
+        except Exception:
+            continue
+    return "-7.005100, 110.438100"
+
+
 # Sidebar Navigasi
 st.sidebar.markdown("""
 <div style="text-align: center; padding: 14px 0 18px 0;">
@@ -2799,15 +3397,14 @@ menu = st.sidebar.radio(
     "Navigasi Modul:",
     [
         "📊 Dashboard Utama & Input Data",
-        "📜 Riwayat Inspeksi Gedung",
-        "📑 Panduan AHSP Jateng 2023"
+        "📜 Riwayat Inspeksi Gedung"
     ],
     index=0
 )
 
 st.sidebar.markdown("---")
 
-# Pengaturan Integrasi AI Agent (Disembunyikan secara rapi di bawah toggle Pengembang agar presentasi sidang bersih)
+# Pengaturan Integrasi AI Agent (Disembunyikan secara rapi di bawah toggle Pengembang)
 dev_mode = st.sidebar.checkbox("🛠️ Mode Pengembang (API Dev)", value=False, help="Aktifkan jika ingin menghubungkan aplikasi ke server HTTP POST API eksternal.")
 if dev_mode:
     with st.sidebar.expander("⚙️ Konfigurasi Server AI (Opsional)", expanded=True):
@@ -2823,9 +3420,9 @@ if dev_mode:
             type="password"
         )
         offline_toggle = st.checkbox(
-            "Mode Simulasi Sidang (Offline Safe)",
+            "Mode Simulasi Offline (Offline Safe)",
             value=False,
-            help="Aktifkan opsi ini jika tidak menjalankan server lokal terpisah atau jaringan wifi gedung terkunci saat sidang skripsi."
+            help="Aktifkan opsi ini jika tidak menjalankan server lokal terpisah atau jaringan internet terkendala."
         )
 else:
     api_endpoint_input = "http://localhost:8000/api/analyze-damage"
@@ -2855,7 +3452,7 @@ if _detected_yolo_weight:
         </div>
         <div style="margin-top: 5px; font-size: 0.74rem; color: #047857; line-height: 1.4;">
             File: <code>{os.path.basename(_detected_yolo_weight)}</code><br>
-            Target 4 Kelas: <i>Crack, Spalling, Rebar, Efflorescence</i>
+            Cakupan: Arsitektur & Struktur Gedung
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -2883,53 +3480,19 @@ if menu == "📊 Dashboard Utama & Input Data":
         <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px;">
             <div>
                 <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px;">
-                    <span class="badge-ahsp" style="background:#2563eb; color:#ffffff; border:none; padding:4px 12px;">SKRIPSI TEKNIK SIPIL DIGITAL</span>
+                    <span class="badge-ahsp" style="background:#2563eb; color:#ffffff; border:none; padding:4px 12px;">MANAJEMEN PEMELIHARAAN GEDUNG</span>
                     <div class="live-badge" style="margin-bottom:0;">
                         <span class="live-dot"></span> YOLOV8 ENGINE SIAP
                     </div>
                 </div>
                 <div class="hero-title">Sistem Deteksi Kerusakan Gedung</div>
                 <div class="hero-subtitle">
-                    Aplikasi pemeliharaan bangunan gedung terpadu berbasis Deep Learning YOLOv8 dengan kalkulasi Rencana Anggaran Biaya (RAB) otomatis serta formulir penilaian kondisi fisik dan fungsi (IKBG) sesuai standar AHSP Dinas PU Bina Marga & Cipta Karya Provinsi Jawa Tengah Tahun 2023.
+                    Aplikasi inspeksi & pemeliharaan bangunan gedung berbasis Deep Learning YOLOv8 dengan rincian Rencana Anggaran Biaya (RAB), detail kebutuhan bahan AHSP Jawa Tengah 2023, serta formulir penilaian prosentase kondisi (IKBG).
                 </div>
             </div>
         </div>
     </div>
     """, unsafe_allow_html=True)
-
-    # Accordion Panduan Alur Penggunaan Aplikasi (3 Langkah Praktis)
-    with st.expander("ℹ️ Panduan Alur Penggunaan Aplikasi (3 Langkah Mudah)", expanded=False):
-        st.markdown("""
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; margin-top: 4px;">
-            <div style="background: #eff6ff; border: 1.5px solid #bfdbfe; border-radius: 12px; padding: 14px 16px;">
-                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
-                    <span style="background: #2563eb; color: #ffffff; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 800;">1</span>
-                    <b style="color: #1e40af; font-size: 0.88rem;">Isi Identitas & Pihak Penandatangan</b>
-                </div>
-                <p style="font-size: 0.82rem; color: #1e293b; margin: 0; line-height: 1.5;">
-                    Lengkapi nama gedung, lokasi/ruangan, serta nama surveyor/NIM, dosen pembimbing, dan pengelola gedung untuk dicetak di lembar pengesahan resmi.
-                </p>
-            </div>
-            <div style="background: #f0fdf4; border: 1.5px solid #bbf7d0; border-radius: 12px; padding: 14px 16px;">
-                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
-                    <span style="background: #16a34a; color: #ffffff; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 800;">2</span>
-                    <b style="color: #166534; font-size: 0.88rem;">Pilih Foto & Tentukan Dimensi / Volume</b>
-                </div>
-                <p style="font-size: 0.82rem; color: #1e293b; margin: 0; line-height: 1.5;">
-                    Unggah foto kerusakan elemen gedung (atau jepret kamera HP). Masukkan volume opname langsung atau hitung otomatis via dimensi Panjang × Lebar.
-                </p>
-            </div>
-            <div style="background: #faf5ff; border: 1.5px solid #e9d5ff; border-radius: 12px; padding: 14px 16px;">
-                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
-                    <span style="background: #9333ea; color: #ffffff; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 800;">3</span>
-                    <b style="color: #7e22ce; font-size: 0.88rem;">Deteksi AI, Analisis RAB & Ekspor</b>
-                </div>
-                <p style="font-size: 0.82rem; color: #1e293b; margin: 0; line-height: 1.5;">
-                    Klik tombol analisis. Tinjau skor kondisi IKBG & RAB AHSP 2023, lalu unduh dokumen resmi (PDF, Excel) atau foto anotasi AI (.jpg).
-                </p>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
 
     col_left, col_right = st.columns([1, 1], gap="large")
 
@@ -2943,151 +3506,212 @@ if menu == "📊 Dashboard Utama & Input Data":
         </div>
         """, unsafe_allow_html=True)
 
-        with st.expander("🏢 Identitas Bangunan & Lembar Pengesahan Laporan (Dapat Diisi Bebas)", expanded=True):
-            st.caption("ℹ️ *Aplikasi terbuka untuk umum. Anda dapat mengisi identitas gedung dan nama pihak penandatangan berita acara (Surveyor, Dosen Pembimbing, PPK) untuk dicetak langsung pada lembar pengesahan laporan PDF.*")
+        with st.expander("🏢 Lembar Identitas Bangunan & Inspektor", expanded=True):
             col_id1, col_id2 = st.columns(2)
             with col_id1:
                 nama_gedung_input = st.text_input(
-                    "Nama Bangunan Gedung / Objek Inspeksi:",
+                    "Nama Bangunan:",
                     value=st.session_state.get("inp_gedung", ""),
-                    placeholder="Contoh: Gedung Rektorat, Rumah Tinggal, Ruko, dsb.",
-                    help="Ketik nama fasilitas atau bangunan gedung yang sedang diinspeksi."
+                    placeholder="Contoh: Gedung Kuliah Terpadu / Kantor Utama",
+                    help="Masukkan nama bangunan gedung yang sedang diinspeksi."
                 )
             with col_id2:
                 lokasi_lantai_input = st.text_input(
-                    "Lokasi / Lantai / Ruangan:",
+                    "Nama Ruangan:",
                     value=st.session_state.get("inp_lokasi", ""),
-                    placeholder="Contoh: Lantai 2 - Ruang 204, Selasar Barat...",
-                    help="Ketik spesifikasi zona, lantai, atau ruangan lokasi kerusakan."
+                    placeholder="Contoh: Lantai 2 - Ruang 204 / Lobby Utama",
+                    help="Masukkan nama ruangan atau zona lokasi inspeksi."
                 )
 
-            st.markdown("<p style='font-size:0.86rem; font-weight:800; color:#0f172a; margin:10px 0 2px 0;'>✍️ Data Pihak Penandatangan Laporan PDF (Opsional):</p>", unsafe_allow_html=True)
-            col_sig1, col_sig2 = st.columns(2)
-            with col_sig1:
+            objek_options = list(AHSPKnowledgeBase.OBJEK_INSPEKSI_MAP.keys())
+            default_obj_idx = objek_options.index(st.session_state.get("inp_objek", objek_options[0])) if st.session_state.get("inp_objek") in objek_options else 0
+            objek_inspeksi_pilihan = st.selectbox(
+                "Objek Inspeksi (Dapat Dipilih):",
+                objek_options,
+                index=default_obj_idx,
+                help="Pilih komponen Arsitektur atau Struktur yang sedang diperiksa."
+            )
+
+            col_id3, col_id4 = st.columns(2)
+            with col_id3:
                 surveyor_input = st.text_input(
-                    "1. Surveyor / Penguji Lapangan:",
+                    "Nama Inspektor (Dibuat Oleh):",
                     value=st.session_state.get("inp_surveyor", ""),
-                    placeholder="Contoh: Ahmad Fajar, S.T. / Nama Anda",
-                    help="Nama pemeriksa yang menyusun laporan."
+                    placeholder="Contoh: Ahmad Fajar, S.T.",
+                    help="Nama inspektor lapangan yang menyusun laporan."
                 )
-            with col_sig2:
+            with col_id4:
+                tanggal_inspeksi_obj = st.date_input(
+                    "Tanggal, Bulan, Tahun:",
+                    value=st.session_state.get("inp_tanggal_obj", date.today()),
+                    format="DD/MM/YYYY",
+                    help="Pilih tanggal pelaksanaan inspeksi lapangan."
+                )
+
+            auto_coord_default = st.session_state.get("inp_koordinat") or get_auto_coordinates()
+            col_k1, col_k2 = st.columns([2, 1])
+            with col_k1:
+                koordinat_input = st.text_input(
+                    "Koordinat Lokasi (Otomatis):",
+                    value=auto_coord_default,
+                    help="Terdeteksi otomatis (Latitude, Longitude). Dapat disesuaikan jika berada di titik berbeda."
+                )
+            with col_k2:
                 surveyor_nip_input = st.text_input(
-                    "NIM / NIP Surveyor:",
+                    "NIP / ID Inspektor:",
                     value=st.session_state.get("inp_surveyor_nip", ""),
-                    placeholder="Contoh: NIM. 5112419001",
-                    help="Nomor Induk Mahasiswa atau NIP surveyor."
+                    placeholder="Opsional"
                 )
 
-            col_sig3, col_sig4 = st.columns(2)
-            with col_sig3:
-                dosen_input = st.text_input(
-                    "2. Dosen Pembimbing / Penguji:",
-                    value=st.session_state.get("inp_dosen", ""),
-                    placeholder="Contoh: Ir. Budi Santoso, M.T. (Opsional)",
-                    help="Nama Dosen Pembimbing / Penguji untuk lembar pengesahan."
-                )
-            with col_sig4:
-                dosen_nip_input = st.text_input(
-                    "NIP Dosen Pembimbing / Penguji:",
-                    value=st.session_state.get("inp_dosen_nip", ""),
-                    placeholder="Contoh: NIP. 19750812 200003 1 002 (Opsional)",
-                    help="Nomor Induk Pegawai Dosen Pembimbing / Penguji."
-                )
+            st.components.v1.html("""
+                <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 12px; color: #334155; display: flex; align-items: center; gap: 8px; padding: 4px 8px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px;">
+                    <span id="gps_status">📍 Sensor GPS Perangkat: Mencari sinyal...</span>
+                </div>
+                <script>
+                if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition(
+                        function(pos) {
+                            const lat = pos.coords.latitude.toFixed(6);
+                            const lon = pos.coords.longitude.toFixed(6);
+                            document.getElementById("gps_status").innerHTML =
+                                "📍 <b>GPS Perangkat Terbaca:</b> <code>" + lat + ", " + lon + "</code>";
+                        },
+                        function() {
+                            document.getElementById("gps_status").innerHTML =
+                                "📍 Koordinat otomatis berbasis lokasi jaringan aktif.";
+                        },
+                        {enableHighAccuracy: true, timeout: 4000}
+                    );
+                } else {
+                    document.getElementById("gps_status").innerHTML = "📍 Koordinat otomatis aktif.";
+                }
+                </script>
+            """, height=36)
 
-            col_sig5, col_sig6 = st.columns(2)
-            with col_sig5:
+            col_sig_p1, col_sig_p2 = st.columns(2)
+            with col_sig_p1:
                 ppk_input = st.text_input(
-                    "3. Pengelola Gedung / PPK:",
+                    "Disetujui Oleh (Pengelola Gedung / PPK):",
                     value=st.session_state.get("inp_ppk", ""),
-                    placeholder="Contoh: Hendra Kusuma, S.T., M.Eng. (Opsional)",
-                    help="Nama Pengelola Gedung atau Pejabat Pembuat Komitmen (PPK)."
+                    placeholder="Contoh: Hendra Kusuma, S.T. (Opsional)"
                 )
-            with col_sig6:
+            with col_sig_p2:
                 ppk_nip_input = st.text_input(
-                    "NIP Pengelola Gedung / PPK:",
+                    "NIP Pejabat Penyetuju:",
                     value=st.session_state.get("inp_ppk_nip", ""),
-                    placeholder="Contoh: NIP. 19820415 200812 1 001 (Opsional)",
-                    help="Nomor Induk Pegawai Pengelola Gedung / PPK."
+                    placeholder="Opsional"
                 )
 
-            # Simpan ke session_state agar nilai tetap tersimpan saat navigasi tab/refresh
+            bulan_id = [
+                "", "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+                "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+            ]
+            tanggal_formatted = f"{tanggal_inspeksi_obj.day:02d} {bulan_id[tanggal_inspeksi_obj.month]} {tanggal_inspeksi_obj.year}"
+
             st.session_state["inp_gedung"] = nama_gedung_input
             st.session_state["inp_lokasi"] = lokasi_lantai_input
+            st.session_state["inp_objek"] = objek_inspeksi_pilihan
             st.session_state["inp_surveyor"] = surveyor_input
             st.session_state["inp_surveyor_nip"] = surveyor_nip_input
-            st.session_state["inp_dosen"] = dosen_input
-            st.session_state["inp_dosen_nip"] = dosen_nip_input
+            st.session_state["inp_tanggal_obj"] = tanggal_inspeksi_obj
+            st.session_state["inp_koordinat"] = koordinat_input
             st.session_state["inp_ppk"] = ppk_input
             st.session_state["inp_ppk_nip"] = ppk_nip_input
 
             st.session_state["signer_info"] = {
                 "surveyor_name": surveyor_input.strip() if surveyor_input else "",
                 "surveyor_nip": surveyor_nip_input.strip() if surveyor_nip_input else "",
-                "dosen_name": dosen_input.strip() if dosen_input else "",
-                "dosen_nip": dosen_nip_input.strip() if dosen_nip_input else "",
                 "ppk_name": ppk_input.strip() if ppk_input else "",
                 "ppk_nip": ppk_nip_input.strip() if ppk_nip_input else "",
             }
 
+        # Area Unggah Foto Diperbesar dengan Visual Kamera
+        st.markdown("""
+        <div class="camera-upload-hero">
+            <div style="font-size: 3.1rem; line-height: 1; margin-bottom: 6px;">📷</div>
+            <div style="font-size: 1rem; font-weight: 800; color: #0f172a;">1. Unggah Foto Kerusakan Bangunan</div>
+            <div style="font-size: 0.82rem; font-weight: 600; color: #334155;">Ambil foto langsung dari kamera atau pilih berkas JPG / PNG</div>
+        </div>
+        """, unsafe_allow_html=True)
+
         uploaded_file = st.file_uploader(
-            "1. Unggah Foto Kerusakan (JPG / PNG):",
+            "Pilih atau seret foto kerusakan ke kotak ini (JPG / PNG):",
             type=["jpg", "jpeg", "png"],
+            label_visibility="collapsed",
             help="Pilih foto dokumentasi visual kerusakan elemen bangunan gedung."
         )
+        st.markdown('<div class="camera-upload-caption">⚠️ Harap unggah foto kerusakan secara jelas</div>', unsafe_allow_html=True)
 
-        elemen_pilihan = st.selectbox(
-            "2. Elemen Gedung yang Diinspeksi:",
-            [
-                "Balok Beton Bertulang",
-                "Kolom Struktur Beton",
-                "Dinding Pasangan Bata / Hebel",
-                "Pelat Lantai / Dak Beton",
-                "Plafon Gypsum / Akustik",
-                "Lantai Keramik / Granit",
-                "Kusen Pintu / Jendela Aluminium",
-                "Dinding Eksterior / Interior"
-            ],
-            index=2,
-            help="Pilih elemen gedung atau biarkan AI melakukan pencocokan karakteristik elemen."
+        sub_kerusakan_opts = ["Deteksi Otomatis AI"] + AHSPKnowledgeBase.OBJEK_INSPEKSI_MAP.get(objek_inspeksi_pilihan, [])
+        jenis_kerusakan_pilihan = st.selectbox(
+            f"2. Jenis Kerusakan ({objek_inspeksi_pilihan}):",
+            sub_kerusakan_opts,
+            index=1 if len(sub_kerusakan_opts) > 1 else 0,
+            help="Pilih gejala kerusakan spesifik agar pencocokan material AHSP dan skala penilaian 100% akurat."
         )
 
-        # Deteksi otomatis karakteristik satuan elemen (m' panjang linier atau m2 luas permukaan)
-        is_linier = elemen_pilihan in ["Balok Beton Bertulang", "Kusen Pintu / Jendela Aluminium"]
-        satuan_default = "m'" if is_linier else "m2"
+        # Deteksi satuan otomatis berdasarkan item AHSP terkait
+        matched_preview = AHSPKnowledgeBase.find_by_element_and_defect(objek_inspeksi_pilihan, jenis_kerusakan_pilihan)
+        satuan_default = matched_preview.get("satuan", "m2")
+        is_linier = (satuan_default == "m'")
+        is_lantai = ("lantai" in objek_inspeksi_pilihan.lower() and "dak" not in objek_inspeksi_pilihan.lower())
 
-        # Pilihan Metode Input Volume: Input Langsung atau Kalkulator Dimensi Lapangan (Panjang x Lebar)
+        metode_opts = ["Input Volume Langsung (Opname)", "📐 Hitung dari Dimensi (Panjang × Lebar / Linier)"]
+        if is_lantai:
+            metode_opts.append("🧱 Hitung per Keping Keramik (1 buah, dst.)")
+
         metode_vol = st.radio(
-            "3. Metode Penentuan Volume Kerusakan:",
-            ["Input Volume Langsung (Opname / Rekap)", "📐 Hitung dari Dimensi Lapangan (Panjang × Lebar / Linier)"],
+            "3. Metode Penentuan Volume & Skala Prosentase:",
+            metode_opts,
             horizontal=True
         )
 
-        if metode_vol == "📐 Hitung dari Dimensi Lapangan (Panjang × Lebar / Linier)":
+        if metode_vol == "🧱 Hitung per Keping Keramik (1 buah, dst.)":
+            c_kr1, c_kr2 = st.columns(2)
+            with c_kr1:
+                jml_keramik = st.number_input("Jumlah Keping Rusak (buah):", min_value=1, value=1, step=1)
+            with c_kr2:
+                uk_keramik = st.selectbox(
+                    "Ukuran 1 Keping Keramik:",
+                    ["60 × 60 cm (0.36 m²)", "40 × 40 cm (0.16 m²)", "50 × 50 cm (0.25 m²)", "30 × 30 cm (0.09 m²)"],
+                    index=0
+                )
+            area_per_keping = {"60 × 60 cm (0.36 m²)": 0.36, "40 × 40 cm (0.16 m²)": 0.16, "50 × 50 cm (0.25 m²)": 0.25, "30 × 30 cm (0.09 m²)": 0.09}[uk_keramik]
+            volume_input = float(round(jml_keramik * area_per_keping, 2))
+            st.success(f"Volume Terhitung: **{jml_keramik} keping × {area_per_keping:.2f} m² = {volume_input:.2f} m²**")
+        elif metode_vol == "📐 Hitung dari Dimensi (Panjang × Lebar / Linier)":
             if is_linier:
-                st.info(f"💡 Elemen **{elemen_pilihan}** menggunakan satuan panjang linier (**m'**). Cukup input panjang kerusakan tanpa dikalikan lebar.")
-                panjang_m = st.number_input("Panjang Kerusakan / Retak (meter):", min_value=0.1, value=5.0, step=0.5)
+                panjang_m = st.number_input("Panjang Kerusakan (meter):", min_value=0.1, value=2.0, step=0.5)
                 volume_input = float(round(panjang_m, 2))
                 st.success(f"Volume Terhitung: **{volume_input:.2f} m'**")
             else:
-                st.info(f"💡 Elemen **{elemen_pilihan}** menggunakan satuan luas (**m²**). Dihitung dari formula: **Luas = Panjang × Lebar/Tinggi**.")
                 c_p, c_l = st.columns(2)
                 with c_p:
-                    panjang_m = st.number_input("Panjang (meter):", min_value=0.1, value=5.0, step=0.5)
+                    panjang_m = st.number_input("Panjang Area Rusak (m):", min_value=0.1, value=1.5, step=0.5)
                 with c_l:
-                    lebar_m = st.number_input("Lebar / Tinggi (meter):", min_value=0.1, value=2.5, step=0.5)
+                    lebar_m = st.number_input("Lebar / Tinggi Area Rusak (m):", min_value=0.1, value=1.0, step=0.5)
                 volume_input = float(round(panjang_m * lebar_m, 2))
                 st.success(f"Volume Terhitung: **{panjang_m:.2f} m × {lebar_m:.2f} m = {volume_input:.2f} m²**")
         else:
             volume_input = st.number_input(
-                f"Masukkan Besaran Volume Kerusakan ({satuan_default}):",
-                min_value=0.1,
+                f"Masukkan Volume Kerusakan ({satuan_default}):",
+                min_value=0.05,
                 max_value=10000.0,
-                value=12.5,
-                step=0.5,
-                help=f"Masukkan besaran volume kerusakan ({satuan_default}) sesuai jenis pekerjaan."
+                value=1.0 if not is_lantai else 0.36,
+                step=0.1,
+                help=f"Masukkan besaran volume kerusakan ({satuan_default})."
             )
 
-        st.caption(f"ℹ️ *Satuan volume terdeteksi: **{satuan_default}** (terstandar AHSP Dinas PU Cipta Karya Jateng 2023).*")
+        luas_total_input = st.number_input(
+            f"4. Total Luas / Panjang Komponen pada Ruangan ({satuan_default}) [Skala Prosentase]:",
+            min_value=0.5,
+            max_value=100000.0,
+            value=20.0 if not is_linier else 10.0,
+            step=1.0,
+            help="Digunakan untuk menghitung prosentase kerusakan secara logis: (Volume Rusak ÷ Total Luas Komponen) × 100%."
+        )
+        est_pct = min(100.0, round((volume_input / max(0.1, luas_total_input)) * 100.0, 2))
+        st.caption(f"📊 *Prosentase Kerusakan Terhitung: **{est_pct:.2f}%** ({volume_input:.2f} {satuan_default} dari total {luas_total_input:.1f} {satuan_default}).*")
 
         start_btn = st.button("🚀 Mulai Analisis Sistem", type="primary", use_container_width=True)
 
@@ -3096,7 +3720,7 @@ if menu == "📊 Dashboard Utama & Input Data":
         <div class="tw-card">
             <div class="tw-card-header">
                 <h4 style="margin: 0; color: #0f172a; font-weight: 800;">🔍 Sensor Visual & Pratinjau Citra</h4>
-                <p style="margin: 4px 0 0 0; font-size: 0.88rem; color: #1e293b; font-weight: 600;">Citra yang diunggah akan dikonversi ke Base64 dan dianalisis oleh AI Agent.</p>
+                <p style="margin: 4px 0 0 0; font-size: 0.88rem; color: #1e293b; font-weight: 600;">Citra yang diunggah akan dianalisis oleh sistem Computer Vision YOLOv8.</p>
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -3110,8 +3734,7 @@ if menu == "📊 Dashboard Utama & Input Data":
                     use_container_width=True
                 )
                 st.success(f"🎯 Bounding box deteksi visual AI aktif | Kode AHSP: {st.session_state.latest_analysis.get('kode_ahsp')}")
-                
-                # Fitur 4: Unduh Foto Anotasi AI (.jpg) untuk Lampiran Skripsi Bab 4
+
                 elemen_tag = str(st.session_state.latest_analysis.get('elemen_gedung', 'Elemen')).replace(' ', '_').replace('/', '_')
                 st.download_button(
                     label="📸 Unduh Citra Deteksi AI (.jpg)",
@@ -3132,13 +3755,11 @@ if menu == "📊 Dashboard Utama & Input Data":
             st.image(image, caption=f"Dokumentasi Foto: {uploaded_file.name}", use_container_width=True)
             st.success(f"✅ Citra berhasil dimuat: {image.width}x{image.height} px | Ukuran file: {uploaded_file.size / 1024:.1f} KB")
         else:
-            st.info("💡 Silakan unggah foto kerusakan pada formulir di sebelah kiri untuk melihat pratinjau citra dan memulai analisis.")
-            # Placeholder ilustrasi visual
             st.markdown("""
             <div class="upload-placeholder">
                 <span class="floating-icon">📸</span>
                 <p style="margin-top: 14px; font-weight: 800; color: #0f172a; font-size: 1.05rem;">Belum ada foto yang dipilih</p>
-                <p style="font-size: 0.86rem; color: #1e293b; font-weight: 600; margin: 0; max-width: 320px; margin-inline: auto;">Pilih foto kerusakan bangunan gedung (JPEG/PNG) pada formulir sebelah kiri untuk pratinjau citra dan analisis.</p>
+                <p style="font-size: 0.86rem; color: #1e293b; font-weight: 600; margin: 0; max-width: 320px; margin-inline: auto;">Pilih foto kerusakan pada kotak unggah di sebelah kiri untuk pratinjau citra dan memulai analisis.</p>
             </div>
             """, unsafe_allow_html=True)
 
@@ -3147,38 +3768,40 @@ if menu == "📊 Dashboard Utama & Input Data":
     # ==============================================================================================
     if start_btn:
         if uploaded_file is None:
-            st.warning("⚠️ Harap unggah foto kerusakan bangunan terlebih dahulu sebelum memulai analisis!")
+            st.warning("⚠️ Harap unggah foto kerusakan secara jelas sebelum memulai analisis!")
         else:
-            with st.spinner("⏳ Menjalankan inferensi model YOLOv8 & Menghitung Estimasi AHSP Jateng 2023..."):
-                # Baca bytes gambar
+            with st.spinner("loading"):
                 img_bytes = uploaded_file.getvalue()
                 fname = uploaded_file.name
 
-                # Panggil Engine YOLOv8 & Civil AI
                 result_ai = AIAgentClient.call_agent(
                     image_bytes=img_bytes,
                     filename=fname,
                     volume=volume_input,
-                    elemen_gedung=elemen_pilihan,
+                    elemen_gedung=objek_inspeksi_pilihan,
                     endpoint_url=api_endpoint_input,
                     api_key=api_token_input,
-                    force_simulation=offline_toggle
+                    force_simulation=offline_toggle,
+                    luas_total=luas_total_input,
+                    jenis_kerusakan_pilihan=jenis_kerusakan_pilihan
                 )
 
-                # Pembersihan input string pengguna (jika kosong, gunakan fallback netral)
                 nama_gedung_clean = nama_gedung_input.strip() if nama_gedung_input and nama_gedung_input.strip() else "Bangunan Gedung"
                 lokasi_clean = lokasi_lantai_input.strip() if lokasi_lantai_input and lokasi_lantai_input.strip() else "-"
-                surveyor_clean = surveyor_input.strip() if surveyor_input and surveyor_input.strip() else "Surveyor Lapangan"
+                surveyor_clean = surveyor_input.strip() if surveyor_input and surveyor_input.strip() else "Inspektor Lapangan"
+                koordinat_clean = koordinat_input.strip() if koordinat_input and koordinat_input.strip() else get_auto_coordinates()
 
                 result_ai["nama_gedung"] = nama_gedung_clean
                 result_ai["lokasi_lantai"] = lokasi_clean
                 result_ai["surveyor"] = surveyor_clean
+                result_ai["koordinat_lokasi"] = koordinat_clean
+                result_ai["objek_inspeksi"] = objek_inspeksi_pilihan
+                result_ai["tanggal"] = tanggal_formatted
 
-                # Bounding Box AI Annotation
                 annotated_img = AIVisualAnnotator.annotate(
                     image_bytes=img_bytes,
-                    jenis_kerusakan=result_ai.get("jenis_kerusakan", "Retak Permukaan"),
-                    tingkat_keparahan=result_ai.get("tingkat_keparahan", "Sedang"),
+                    jenis_kerusakan=result_ai.get("jenis_kerusakan", "Kerusakan Permukaan"),
+                    tingkat_keparahan=result_ai.get("tingkat_keparahan", "Ringan"),
                     confidence_score=result_ai.get("confidence_score", 96.5),
                     kode_ahsp=result_ai.get("kode_ahsp", "A.4.4.1.25.JT"),
                     detected_boxes=result_ai.get("detected_boxes")
@@ -3186,21 +3809,23 @@ if menu == "📊 Dashboard Utama & Input Data":
                 st.session_state.annotated_img_bytes = annotated_img
                 st.session_state.uploaded_img_bytes = img_bytes
 
-                # Simpan ke Database SQLite secara otomatis
-                today_now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 record_id = DatabaseManager.insert_riwayat(
-                    tanggal=today_now,
-                    elemen_gedung=result_ai.get("elemen_gedung", elemen_pilihan),
-                    jenis_kerusakan=result_ai.get("jenis_kerusakan", "Retak Permukaan"),
+                    tanggal=tanggal_formatted,
+                    elemen_gedung=result_ai.get("elemen_gedung", objek_inspeksi_pilihan),
+                    jenis_kerusakan=result_ai.get("jenis_kerusakan", "Kerusakan Permukaan"),
                     kode_ahsp=result_ai.get("kode_ahsp", "A.4.4.1.25.JT"),
                     volume=float(result_ai.get("volume", volume_input)),
-                    satuan=result_ai.get("satuan", "m2"),
+                    satuan=result_ai.get("satuan", satuan_default),
                     harga_satuan=int(result_ai.get("harga_satuan", 0)),
                     total_biaya=int(result_ai.get("total_biaya", 0)),
                     rekomendasi=result_ai.get("rekomendasi", "Perbaikan standar sesuai metode kerja."),
                     nama_gedung=nama_gedung_clean,
                     lokasi_lantai=lokasi_clean,
-                    surveyor=surveyor_clean
+                    surveyor=surveyor_clean,
+                    koordinat_lokasi=koordinat_clean,
+                    objek_inspeksi=objek_inspeksi_pilihan,
+                    luas_total=float(result_ai.get("luas_total", luas_total_input)),
+                    persentase_kerusakan=float(result_ai.get("persentase_kerusakan", est_pct))
                 )
 
                 result_ai["db_id"] = record_id
@@ -3221,7 +3846,7 @@ if menu == "📊 Dashboard Utama & Input Data":
             st.success(f"🟢 **Koneksi Live HTTP POST Berhasil:** Respon diterima dari endpoint `{res.get('api_endpoint_used')}` | ID Riwayat DB: #{res.get('db_id')}")
         else:
             engine_label = res.get("mode", "YOLOv8 & Civil Vision Engine")
-            st.success(f"🟢 **Status Engine:** {engine_label} (Mode Sidang Mandiri Aktif) | ID Riwayat DB: #{res.get('db_id')}")
+            st.success(f"🟢 **Status Engine:** {engine_label} (Mode Analisis Mandiri Aktif) | ID Riwayat DB: #{res.get('db_id')}")
 
         st.markdown("### 📊 Hasil Penilaian Kondisi & Estimasi Biaya Pemeliharaan")
 
@@ -3312,18 +3937,27 @@ if menu == "📊 Dashboard Utama & Input Data":
                 col_btn_apply, _ = st.columns([1, 1])
                 with col_btn_apply:
                     if st.button("🔄 Terapkan Volume Baru Ini ke Laporan & Database", type="primary", use_container_width=True):
-                        # Update session state
+                        # Hitung ulang persentase kerusakan & tingkat keparahan secara proporsional
+                        updated_item = dict(st.session_state.latest_analysis)
+                        updated_item["volume"] = sim_volume
+                        updated_item["total_biaya"] = sim_total_biaya
+                        recalc_eval = compute_condition_assessment(updated_item)
+                        new_pct = float(recalc_eval.get("persentase_kerusakan", 0.0))
+                        new_sev = recalc_eval.get("keparahan", updated_item.get("tingkat_keparahan", "Sedang"))
+
                         st.session_state.latest_analysis["volume"] = sim_volume
                         st.session_state.latest_analysis["total_biaya"] = sim_total_biaya
-                        # Update SQLite database
+                        st.session_state.latest_analysis["persentase_kerusakan"] = new_pct
+                        st.session_state.latest_analysis["tingkat_keparahan"] = new_sev
+
                         with DatabaseManager.get_connection() as conn:
                             cur = conn.cursor()
                             cur.execute(
-                                "UPDATE riwayat_kerusakan SET volume = ?, total_biaya = ? WHERE id = ?",
-                                (sim_volume, sim_total_biaya, res.get("db_id"))
+                                "UPDATE riwayat_kerusakan SET volume = ?, total_biaya = ?, persentase_kerusakan = ?, tingkat_keparahan = ? WHERE id = ?",
+                                (sim_volume, sim_total_biaya, new_pct, new_sev, res.get("db_id"))
                             )
                             conn.commit()
-                        st.success(f"✅ Volume berhasil diperbarui menjadi {sim_volume:.2f} {satuan_kerja} dengan total RAB {format_rupiah(sim_total_biaya)}!")
+                        st.success(f"✅ Volume diperbarui ke {sim_volume:.2f} {satuan_kerja} (Prosentase: {new_pct:.2f}% | {new_sev}) dengan RAB {format_rupiah(sim_total_biaya)}!")
                         st.rerun()
 
         # Rincian Tabel Kalkulasi RAB
@@ -3354,80 +3988,79 @@ if menu == "📊 Dashboard Utama & Input Data":
         st.table(df_rab)
 
         # -----------------------------------------------------------------------------------------
-        # FITUR 1: TRANSPARANSI FORMULA & RINCIAN KOEFISIEN AHSP
+        # TOTAL ESTIMASI ANGGARAN & RINCIAN AHSP DETAIL PER MASING-MASING BAHAN & TENAGA KERJA
         # -----------------------------------------------------------------------------------------
         kode_item = res.get("kode_ahsp", "")
-        ahsp_detail = AHSPKnowledgeBase.CATALOG.get(kode_item, {})
-        koef_upah = ahsp_detail.get("koefisien_upah", [])
-        koef_bahan = ahsp_detail.get("koefisien_bahan", [])
+        vol_calc = float(res.get("volume", 0.0))
+        sat_calc = res.get("satuan", "m2")
+        ahsp_breakdown = AHSPKnowledgeBase.compute_material_breakdown(kode_item, vol_calc)
+        upah_rows = ahsp_breakdown.get("upah_rows", [])
+        bahan_rows = ahsp_breakdown.get("bahan_rows", [])
 
-        with st.expander("🔬 Transparansi Formula & Breakdown Kebutuhan Bahan / Tenaga Kerja (AHSP Jateng 2023)", expanded=True):
-            st.markdown(f"""
-            <div style="font-size:0.88rem; color:#1e293b; margin-bottom:12px; line-height:1.5;">
-                <b>Metodologi Perhitungan Standar Permen PUPR No. 1/2022 & AHSP Jawa Tengah 2023:</b><br>
-                Harga Satuan Pekerjaan (HSP) untuk kode <code>{kode_item}</code> (<b>{res.get('deskripsi_ahsp')}</b>) dibentuk dari akumulasi perkalian koefisien indeks tenaga kerja dan kebutuhan material dikalikan faktor overhead & profit (15%):
+        st.markdown(f"""
+        <div style="background: linear-gradient(135deg, #ecfdf5 0%, #f0fdf4 100%); border: 2px solid #86efac; border-radius: 14px; padding: 18px 22px; margin: 14px 0 18px 0; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+            <div>
+                <div style="font-size: 0.78rem; font-weight: 800; color: #166534; text-transform: uppercase; letter-spacing: 0.7px;">Total Estimasi Anggaran Perbaikan (RAB)</div>
+                <div style="font-size: 0.92rem; color: #1e293b; font-weight: 600; margin-top: 4px;">
+                    {res.get('deskripsi_ahsp')} ({vol_calc:.2f} {sat_calc})
+                </div>
             </div>
-            """, unsafe_allow_html=True)
-
-            st.latex(r"HSP = \left[ \sum_{i=1}^{n} (K_{\text{Tenaga}, i} \times U_i) + \sum_{j=1}^{m} (K_{\text{Bahan}, j} \times H_j) \right] \times (1 + \text{Overhead } 15\%)")
-            st.latex(r"\text{Total Estimasi Anggaran (RAB)} = \text{Volume Pekerjaan } (V) \times HSP")
-
-            vol_calc = float(res.get("volume", 0.0))
-            sat_calc = res.get("satuan", "m2")
-
-            st.markdown(f"""
-            <div style="background:#f8fafc; border:1.5px solid #cbd5e1; border-radius:10px; padding:10px 16px; margin: 10px 0 14px 0; font-size:0.88rem; color:#1e293b;">
-                📌 <b>Kalkulasi Aktual RAB:</b> {vol_calc:.2f} {sat_calc} × {format_rupiah(res.get('harga_satuan', 0))} = <b style="color:#16a34a; font-size:0.95rem;">{format_rupiah(res.get('total_biaya', 0))}</b>
+            <div style="font-size: 1.75rem; font-weight: 900; color: #15803d;">
+                {format_rupiah(res.get('total_biaya', 0))}
             </div>
-            """, unsafe_allow_html=True)
+        </div>
+        """, unsafe_allow_html=True)
 
+        with st.expander("🧱 Rincian AHSP Detail per Masing-Masing Bahan & Tenaga Kerja (AHSP Jateng 2023)", expanded=True):
             col_koef1, col_koef2 = st.columns(2)
             with col_koef1:
-                st.markdown("<div style='background:#eff6ff; border-left:4px solid #2563eb; padding:6px 12px; border-radius:4px; margin-bottom:8px;'><b style='color:#1e40af; font-size:0.88rem;'>👷 Kebutuhan Tenaga Kerja Lapangan (OH):</b></div>", unsafe_allow_html=True)
-                if koef_upah:
-                    list_upah_data = []
-                    for u in koef_upah:
-                        k_val = u.get("koef", 0)
-                        tot_oh = round(k_val * vol_calc, 3)
-                        list_upah_data.append({
-                            "Unsur Tenaga Kerja": u.get("tenaga", "-"),
-                            "Koefisien Indeks": f"{k_val:.3f}",
-                            "Kebutuhan Riil": f"{tot_oh:.3f} OH"
-                        })
-                    df_upah = pd.DataFrame(list_upah_data)
+                st.markdown("<div style='background:#eff6ff; border-left:4px solid #2563eb; padding:6px 12px; border-radius:4px; margin-bottom:8px;'><b style='color:#1e40af; font-size:0.88rem;'>👷 Rincian Tenaga Kerja Lapangan:</b></div>", unsafe_allow_html=True)
+                if upah_rows:
+                    df_upah = pd.DataFrame([
+                        {
+                            "Unsur Tenaga Kerja": r["Unsur Tenaga Kerja"],
+                            "Koef.": f"{r['Koefisien']:.3f}",
+                            "Kebutuhan": f"{r['Kebutuhan Riil']:.3f} {r['Satuan']}",
+                            "Harga Satuan": format_rupiah(r["Harga Satuan"]),
+                            "Jumlah Biaya": format_rupiah(r["Jumlah Biaya"]),
+                        }
+                        for r in upah_rows
+                    ])
                     st.dataframe(df_upah, use_container_width=True, hide_index=True)
+                    st.caption(f"Subtotal Biaya Tenaga Kerja (untuk {vol_calc:.2f} {sat_calc}): **{format_rupiah(round(ahsp_breakdown['subtotal_upah'] * vol_calc))}**")
                 else:
-                    st.caption("Standard Tenaga Kerja Operasional Pemeliharaan")
+                    st.caption("Detail tenaga kerja mengikuti satuan standar pekerjaan.")
 
             with col_koef2:
-                st.markdown("<div style='background:#f0fdf4; border-left:4px solid #16a34a; padding:6px 12px; border-radius:4px; margin-bottom:8px;'><b style='color:#166534; font-size:0.88rem;'>🧱 Kebutuhan Bahan & Material Proyek:</b></div>", unsafe_allow_html=True)
-                if koef_bahan:
-                    list_bahan_data = []
-                    for b in koef_bahan:
-                        k_val = b.get("koef", 0)
-                        tot_b = round(k_val * vol_calc, 3)
-                        list_bahan_data.append({
-                            "Nama Bahan Material": b.get("bahan", "-"),
-                            "Koefisien Indeks": f"{k_val:.3f}",
-                            "Total Kebutuhan Lapangan": f"{tot_b:.2f} {b.get('satuan', '')}"
-                        })
-                    df_bahan = pd.DataFrame(list_bahan_data)
+                st.markdown("<div style='background:#f0fdf4; border-left:4px solid #16a34a; padding:6px 12px; border-radius:4px; margin-bottom:8px;'><b style='color:#166534; font-size:0.88rem;'>🧱 Rincian Masing-Masing Bahan & Material:</b></div>", unsafe_allow_html=True)
+                if bahan_rows:
+                    df_bahan = pd.DataFrame([
+                        {
+                            "Nama Bahan / Material": r["Nama Bahan / Material"],
+                            "Koef.": f"{r['Koefisien']:.3f}",
+                            "Kebutuhan": f"{r['Kebutuhan Riil']:.3f} {r['Satuan']}",
+                            "Harga Satuan": format_rupiah(r["Harga Satuan"]),
+                            "Jumlah Biaya": format_rupiah(r["Jumlah Biaya"]),
+                        }
+                        for r in bahan_rows
+                    ])
                     st.dataframe(df_bahan, use_container_width=True, hide_index=True)
+                    st.caption(f"Subtotal Biaya Bahan (untuk {vol_calc:.2f} {sat_calc}): **{format_rupiah(round(ahsp_breakdown['subtotal_bahan'] * vol_calc))}**")
                 else:
-                    st.caption("Standard Material Komposit Spesialis")
+                    st.caption("Detail material mengikuti satuan standar pekerjaan.")
 
             st.markdown(f"""
-            <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:8px; padding:10px 14px; margin-top:10px; font-size:0.82rem; color:#475569; line-height:1.5;">
-                💡 <b>Catatan Teknis Sipil:</b> Satuan Orang-Hari (OH) menyatakan jumlah pekerja per hari durasi standar 7 jam kerja. Perhitungan logistik material telah memperhitungkan faktor kehilangan/toleransi susut standar AHSP Dinas Bina Marga & Cipta Karya Jawa Tengah 2023.
+            <div style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:8px; padding:10px 14px; margin-top:8px; font-size:0.85rem; color:#1e293b;">
+                <b>Ringkasan Biaya Satuan ({kode_item}):</b> Tenaga + Bahan = <b>{format_rupiah(ahsp_breakdown['subtotal_langsung'])}</b> | Overhead &amp; Profit (15%) = <b>{format_rupiah(ahsp_breakdown['overhead_15'])}</b> | HSP/{sat_calc} = <b>{format_rupiah(res.get('harga_satuan', 0))}</b> &rarr; <b>Total Estimasi Anggaran: {format_rupiah(res.get('total_biaya', 0))}</b>
             </div>
             """, unsafe_allow_html=True)
 
         # Tampilan Tabel Matriks Penilaian Kondisi Fisik & Fungsi (IKBG) Sesuai Standar
         eval_ui = compute_condition_assessment(res)
-        with st.expander("📋 Formulir Penilaian Kondisi Fisik & Fungsi Komponen Bangunan (Format Standar IKBG)", expanded=True):
+        with st.expander("📋 Formulir Penilaian Kondisi Fisik, Fungsi & Prosentase Kerusakan (Format IKBG)", expanded=True):
             st.markdown(f"""
             <div style="font-size:0.88rem; color:#1e293b; font-weight:600; margin-bottom:10px;">
-                Matriks evaluasi kondisi fisik dan fungsi mengacu pada pedoman pemeliharaan bangunan gedung (Permen PUPR No. 24/PRT/M/2008).
+                Matriks evaluasi kondisi fisik &amp; fungsi (Permen PUPR No. 24/PRT/M/2008) | <b>Prosentase Kerusakan: {eval_ui['persentase_kerusakan']:.2f}%</b> ({vol_calc:.2f} dari {eval_ui['luas_total']:.2f} {sat_calc}).
             </div>
             """, unsafe_allow_html=True)
 
@@ -3496,68 +4129,38 @@ if menu == "📊 Dashboard Utama & Input Data":
                 </div>
                 """, unsafe_allow_html=True)
 
-        # Langkah Kerja & Rekomendasi
-        col_step, col_rec = st.columns([1, 1], gap="medium")
-        with col_step:
-            st.markdown("""
-            <div class="tw-card">
-                <div class="tw-card-header">
-                    <h5 style="margin: 0; font-weight: 800; color: #0f172a;">🛠️ Prosedur Metode Kerja Standar PUPR</h5>
+        # Langkah-Langkah Perbaikan (Tampilan Baru Grid Tahapan Terstruktur) & Rekomendasi
+        st.markdown("#### 🛠️ Langkah-Langkah Perbaikan & Metode Kerja Standar")
+        steps_list = res.get("langkah_kerja", [])
+        if steps_list:
+            cards_html = '<div class="repair-steps-grid">'
+            for idx, step in enumerate(steps_list, start=1):
+                cards_html += f"""
+                <div class="repair-step-card">
+                    <div class="repair-step-badge">TAHAP {idx}</div>
+                    <div class="repair-step-body">{step}</div>
                 </div>
-            """, unsafe_allow_html=True)
-            for idx, step in enumerate(res.get("langkah_kerja", []), start=1):
-                st.markdown(f"""
-                <div class="step-item">
-                    <div class="step-number">{idx}</div>
-                    <div class="step-text">{step}</div>
-                </div>
-                """, unsafe_allow_html=True)
-            st.markdown("</div>", unsafe_allow_html=True)
+                """
+            cards_html += "</div>"
+            st.markdown(cards_html, unsafe_allow_html=True)
 
-        with col_rec:
-            st.markdown("""
-            <div class="tw-card">
-                <div class="tw-card-header">
-                    <h5 style="margin: 0; font-weight: 800; color: #0f172a;">💡 Rekomendasi Teknis Sipil & Mitigasi</h5>
-                </div>
-            """, unsafe_allow_html=True)
-            st.warning(f"**Rekomendasi Pemeliharaan:** {res.get('rekomendasi')}")
-            st.markdown(f"""
-            <div style="font-size: 0.88rem; color: #1e293b; font-weight: 500; margin-top: 12px; line-height: 1.6;">
-                <b style="color: #0f172a;">Ketentuan Pemeliharaan:</b> Berdasarkan Peraturan Menteri PUPR No. 24/PRT/M/2008, tindakan perbaikan harus segera dilakukan untuk mencegah deteriorasi lebih lanjut yang berisiko menurunkan keandalan struktur dan keselamatan pengguna gedung.
-            </div>
-            </div>
-            """, unsafe_allow_html=True)
+        st.info(f"💡 **Rekomendasi Pemeliharaan Teknis:** {res.get('rekomendasi')}")
 
-        # Tombol Aksi Ekspor Excel & PDF untuk Data Ini
-        col_down1, col_down2 = st.columns(2)
-        with col_down1:
-            excel_single = ExcelReportGenerator.generate_excel_report(
-                [res], title_doc=f"Penilaian - {res.get('elemen_gedung')}"
-            )
-            st.download_button(
-                label="📊 Unduh Formulir Penilaian & RAB (Excel .xlsx)",
-                data=excel_single,
-                file_name=f"Penilaian_IKBG_{res.get('elemen_gedung', 'Elemen').replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                type="primary",
-                use_container_width=True
-            )
-        with col_down2:
-            single_record_pdf = PDFReportGenerator.generate_pdf_report(
-                [res],
-                title_doc=f"Laporan Penilaian - {res.get('elemen_gedung')}",
-                annotated_image_bytes=st.session_state.get("annotated_img_bytes"),
-                signer_info=st.session_state.get("signer_info")
-            )
-            st.download_button(
-                label="📄 Unduh Laporan Resmi & Penilaian (PDF)",
-                data=single_record_pdf,
-                file_name=f"Laporan_PBG_ID_{res.get('db_id')}_{res.get('kode_ahsp')}.pdf",
-                mime="application/pdf",
-                type="secondary",
-                use_container_width=True
-            )
+        # Tombol Unduh Laporan Resmi PDF (Tanpa Excel sesuai Revisi)
+        single_record_pdf = PDFReportGenerator.generate_pdf_report(
+            [res],
+            title_doc=f"Laporan Penilaian - {res.get('elemen_gedung')}",
+            annotated_image_bytes=st.session_state.get("annotated_img_bytes"),
+            signer_info=st.session_state.get("signer_info")
+        )
+        st.download_button(
+            label="📄 Unduh Laporan Resmi Penilaian, Prosentase & RAB (PDF)",
+            data=single_record_pdf,
+            file_name=f"Laporan_PBG_ID_{res.get('db_id')}_{res.get('kode_ahsp')}.pdf",
+            mime="application/pdf",
+            type="primary",
+            use_container_width=True
+        )
 
         # Pratinjau PDF Langsung di Layar (In-App PDF Viewer)
         with st.expander("📑 Pratinjau Dokumen PDF Langsung di Layar (In-App PDF Viewer)", expanded=False):
@@ -3569,7 +4172,7 @@ if menu == "📊 Dashboard Utama & Input Data":
                 f'</iframe>'
             )
             st.markdown(pdf_embed_html, unsafe_allow_html=True)
-            st.caption("ℹ️ *Jendela pratinjau PDF interaktif resmi ReportLab standar A4 untuk presentasi sidang proyektor tanpa berpindah aplikasi.*")
+            st.caption("ℹ️ *Jendela pratinjau PDF resmi standar A4 (Urutan: Dokumentasi Foto -> Formulir Prosentase -> RAB -> Langkah Perbaikan -> TTD 2 Pihak).*")
 
 
 # ==================================================================================================
@@ -3586,7 +4189,7 @@ elif menu == "📜 Riwayat Inspeksi Gedung":
         </div>
         <div class="hero-title">Log Riwayat Penilaian Kondisi Bangunan Gedung</div>
         <div class="hero-subtitle">
-            Daftar seluruh riwayat inspeksi yang tersimpan di dalam database SQLite. Menyediakan ringkasan KPI, filter data elemen gedung, dan fasilitas ekspor laporan resmi PDF serta file Excel (.xlsx) bersertifikasi standar IKBG.
+            Daftar seluruh riwayat inspeksi yang tersimpan di dalam database SQLite. Menyediakan ringkasan KPI, filter data elemen gedung, dan fasilitas ekspor laporan resmi PDF bersertifikasi standar IKBG &amp; AHSP Jateng 2023.
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -3595,7 +4198,7 @@ elif menu == "📜 Riwayat Inspeksi Gedung":
 
     if not records:
         st.info("ℹ️ Database riwayat saat ini masih kosong.")
-        if st.button("🧪 Muat Data Sampel Demonstrasi Sidang Skripsi", type="primary"):
+        if st.button("🧪 Muat Data Sampel Inspeksi Gedung", type="primary"):
             DatabaseManager.seed_initial_demo_data()
             st.rerun()
     else:
@@ -3819,16 +4422,20 @@ elif menu == "📜 Riwayat Inspeksi Gedung":
         # Format tampilan tabel untuk Streamlit dengan Metadata Lengkap
         table_display = []
         for r in filtered_records:
+            pct_r = float(r.get("persentase_kerusakan") or 0.0)
             table_display.append({
                 "ID": r["id"],
                 "Tanggal": str(r["tanggal"])[:16] if r.get("tanggal") else "-",
                 "Gedung": r.get("nama_gedung", "Gedung Kuliah Terpadu"),
-                "Lokasi / Lantai": r.get("lokasi_lantai", "Lantai 2 - Ruang 204"),
-                "Surveyor": r.get("surveyor", "Ahmad Fajar, S.T."),
-                "Elemen Gedung": r["elemen_gedung"],
+                "Ruangan": r.get("lokasi_lantai", "Lantai 2 - Ruang 204"),
+                "Objek Inspeksi": r.get("objek_inspeksi", r["elemen_gedung"]),
+                "Inspektor": r.get("surveyor", "Ahmad Fajar, S.T."),
+                "Koordinat": r.get("koordinat_lokasi", "-"),
                 "Jenis Kerusakan": r["jenis_kerusakan"],
                 "Kode AHSP": r["kode_ahsp"],
                 "Volume": f"{r['volume']:.2f} {r['satuan']}",
+                "Prosentase": f"{pct_r:.2f}%",
+                "Keparahan": r.get("tingkat_keparahan", "Sedang"),
                 "Harga Satuan": format_rupiah(r["harga_satuan"]),
                 "Total Biaya": format_rupiah(r["total_biaya"]),
                 "Rekomendasi Teknis": r["rekomendasi"]
@@ -3837,32 +4444,18 @@ elif menu == "📜 Riwayat Inspeksi Gedung":
         df_display = pd.DataFrame(table_display)
         st.dataframe(df_display, use_container_width=True, hide_index=True)
 
-        # Baris Tombol Aksi Ekspor (Excel, PDF, CSV) & Hapus Data
+        # Baris Tombol Aksi Ekspor (PDF & CSV) & Hapus Data (Tanpa Excel sesuai Revisi)
         st.markdown("""
         <div style="background: #ffffff; border: 1.5px solid #cbd5e1; border-radius: 14px; padding: 16px 20px; margin-top: 20px; margin-bottom: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.03);">
             <div style="font-size: 0.95rem; font-weight: 800; color: #0f172a; display: flex; align-items: center; gap: 8px;">
-                <span>📥</span> <span>Opsi Ekspor Laporan Resmi & Arsip Pemeriksaan:</span>
+                <span>📥</span> <span>Opsi Ekspor Laporan Resmi &amp; Arsip Pemeriksaan:</span>
             </div>
         </div>
         """, unsafe_allow_html=True)
 
-        col_act1, col_act2, col_act3 = st.columns(3)
+        col_act1, col_act2 = st.columns(2)
 
         with col_act1:
-            # Ekspor Excel (.xlsx) dengan Formulir Penilaian Kondisi (IKBG) & RAB
-            excel_data = ExcelReportGenerator.generate_excel_report(
-                filtered_records, title_doc="Laporan Penilaian Gedung Jawa Tengah"
-            )
-            st.download_button(
-                label="📊 Ekspor Formulir IKBG & RAB (Excel)",
-                data=excel_data,
-                file_name=f"Penilaian_IKBG_Jateng_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                type="primary",
-                use_container_width=True
-            )
-
-        with col_act2:
             # Ekspor PDF Resmi ReportLab
             pdf_data = PDFReportGenerator.generate_pdf_report(
                 filtered_records,
@@ -3870,15 +4463,15 @@ elif menu == "📜 Riwayat Inspeksi Gedung":
                 signer_info=st.session_state.get("signer_info")
             )
             st.download_button(
-                label="📄 Ekspor Berita Acara Resmi (PDF)",
+                label="📄 Ekspor Laporan Resmi IKBG & RAB (PDF)",
                 data=pdf_data,
                 file_name=f"Laporan_Resmi_PBG_Jateng_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
                 mime="application/pdf",
-                type="secondary",
+                type="primary",
                 use_container_width=True
             )
 
-        with col_act3:
+        with col_act2:
             # Ekspor CSV
             csv_data = df_all.to_csv(index=False).encode('utf-8')
             st.download_button(
@@ -3886,6 +4479,7 @@ elif menu == "📜 Riwayat Inspeksi Gedung":
                 data=csv_data,
                 file_name=f"Data_Inspeksi_{datetime.now().strftime('%Y%m%d')}.csv",
                 mime="text/csv",
+                type="secondary",
                 use_container_width=True
             )
 
@@ -3930,101 +4524,15 @@ elif menu == "📜 Riwayat Inspeksi Gedung":
                 f'</iframe>'
             )
             st.markdown(pdf_all_embed_html, unsafe_allow_html=True)
-            st.caption("ℹ️ *Pratinjau dokumen laporan audit pemeliharaan gedung resmi format A4 untuk presentasi sidang proyektor tanpa berpindah aplikasi.*")
+            st.caption("ℹ️ *Pratinjau dokumen laporan audit pemeliharaan gedung resmi format A4 tanpa berpindah aplikasi.*")
 
 
 # ==================================================================================================
-# HALAMAN 3: 📑 PANDUAN AHSP JATENG 2023
-# ==================================================================================================
-elif menu == "📑 Panduan AHSP Jateng 2023":
-    st.markdown("""
-    <div class="hero-banner">
-        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
-            <span class="badge-ahsp" style="background:#7c3aed; color:#ffffff; border:none; padding:4px 12px;">DASAR HUKUM & STANDAR TEKNIS</span>
-            <div class="live-badge" style="margin-bottom:0;">
-                <span class="live-dot"></span> REGULASI PERGUB JATENG 2023
-            </div>
-        </div>
-        <div class="hero-title">Katalog AHSP Pemeliharaan Gedung Jawa Tengah 2023</div>
-        <div class="hero-subtitle">
-            Standar Analisis Harga Satuan Pekerjaan (AHSP) Bidang Ke-PU-an Provinsi Jawa Tengah Tahun 2023 berdasarkan Permen PUPR No. 1/PRT/M/2022. Memuat rincian koefisien tenaga kerja, koefisien bahan, dan standar operasional prosedur perbaikan bangunan gedung.
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-    catalog = AHSPKnowledgeBase.get_all()
-
-    # Ringkasan Cepat
-    st.markdown("#### 🔍 Daftar Analisis Harga Satuan Pekerjaan Tersedia")
-
-    # Filter Kategori
-    kategori_list = ["Semua Kategori"] + sorted(list(set(item["kategori"] for item in catalog)))
-    pilih_kat = st.selectbox("Pilih Kategori Pekerjaan:", kategori_list)
-
-    filtered_catalog = catalog
-    if pilih_kat != "Semua Kategori":
-        filtered_catalog = [it for it in filtered_catalog if it["kategori"] == pilih_kat]
-
-    # Grid Card Katalog AHSP
-    for item in filtered_catalog:
-        with st.expander(f"📌 {item['kode']} - {item['nama']} ({format_rupiah(item['harga_satuan'])} / {item['satuan']})"):
-            c1, c2 = st.columns([1, 1])
-
-            with c1:
-                st.markdown(f"**Kategori:** `{item['kategori']}`")
-                st.markdown(f"**Elemen Terkait:** `{item['elemen_terkait']}`")
-                st.markdown(f"**Kerusakan Khas:** `{item['jenis_kerusakan']}`")
-                st.markdown(f"**Tingkat Keparahan Umum:** `{item['tingkat_keparahan']}`")
-                st.markdown(f"**Harga Satuan Standar:** `{format_rupiah(item['harga_satuan'])} per {item['satuan']}`")
-
-                st.markdown("##### 👷 Analisa Koefisien Tenaga Kerja (Upah)")
-                df_upah = pd.DataFrame(item["koefisien_upah"])
-                st.table(df_upah)
-
-            with c2:
-                st.markdown("##### 🧱 Analisa Koefisien Bahan / Material")
-                df_bahan = pd.DataFrame(item["koefisien_bahan"])
-                st.table(df_bahan)
-
-                st.markdown("##### 🛠️ Langkah Metode Pelaksanaan Lapangan")
-                for s_idx, step in enumerate(item["langkah_kerja"], start=1):
-                    st.markdown(f"{s_idx}. {step}")
-
-            st.info(f"**Rekomendasi Ahli:** {item['rekomendasi']}")
-
-    st.markdown("---")
-
-    # Kalkulator Cepat AHSP Jateng
-    st.markdown("### 🧮 Kalkulator Cepat Anggaran Pemeliharaan (AHSP Jateng 2023)")
-    st.caption("Gunakan kalkulator mandiri ini untuk estimasi cepat di lapangan tanpa unggah citra.")
-
-    col_calc1, col_calc2, col_calc3 = st.columns(3)
-    with col_calc1:
-        pilih_item_calc = st.selectbox(
-            "Pilih Item Pekerjaan AHSP:",
-            options=list(AHSPKnowledgeBase.CATALOG.keys()),
-            format_func=lambda x: f"{x} - {AHSPKnowledgeBase.CATALOG[x]['nama']}"
-        )
-    with col_calc2:
-        vol_calc = st.number_input("Masukkan Volume Pekerjaan:", min_value=0.1, value=10.0, step=1.0)
-    with col_calc3:
-        item_obj = AHSPKnowledgeBase.CATALOG[pilih_item_calc]
-        biaya_calc = int(round(vol_calc * item_obj["harga_satuan"]))
-        st.markdown(f"""
-        <div style="background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border: 1.5px solid #86efac; border-radius: 14px; padding: 14px 18px; margin-top: 10px; box-shadow: 0 4px 12px rgba(22, 163, 74, 0.12); transition: all 0.3s ease;">
-            <div style="font-size: 0.76rem; color: #166534; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">ESTIMASI ANGGARAN TOTAL (AHSP):</div>
-            <div style="font-size: 1.55rem; font-weight: 800; color: #15803d; margin-top: 2px;">{format_rupiah(biaya_calc)}</div>
-            <div style="font-size: 0.76rem; color: #166534; margin-top: 4px;">Tarif: <b>{format_rupiah(item_obj['harga_satuan'])}</b> / {item_obj['satuan']}</div>
-        </div>
-        """, unsafe_allow_html=True)
-
-
-# ==================================================================================================
-# 7. FOOTER APLIKASI WEB SKRIPSI
+# 7. FOOTER APLIKASI WEB
 # ==================================================================================================
 st.markdown("""
 <div style="text-align: center; margin-top: 50px; padding: 24px 0; border-top: 1.5px solid #cbd5e1; font-size: 0.86rem; color: #1e293b; font-weight: 500;">
     <b style="color: #0f172a; font-weight: 800;">Sistem Deteksi Kerusakan Gedung</b><br>
-    Program Skripsi Teknik Sipil Digital | Standar Acuan: <span style="color: #0f172a; font-weight: 700;">AHSP Dinas PU Bina Marga & Cipta Karya Jawa Tengah 2023</span>
+    Manajemen Pemeliharaan &amp; Perawatan Bangunan Gedung | Standar Acuan: <span style="color: #0f172a; font-weight: 700;">AHSP Dinas PU Bina Marga &amp; Cipta Karya Jawa Tengah 2023</span>
 </div>
 """, unsafe_allow_html=True)
