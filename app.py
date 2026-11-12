@@ -2246,6 +2246,13 @@ class AHSPKnowledgeBase:
 # ==================================================================================================
 # 4. INTEGRASI MESIN DETEKSI AI YOLOV8 & COMPUTER VISION (VIA requests / lokal)
 # ==================================================================================================
+@st.cache_resource(show_spinner=False)
+def _load_yolo_model(model_path: str):
+    """Memuat dan men-cache model bobot YOLOv8 (best.pt) agar inferensi cepat & konsisten."""
+    from ultralytics import YOLO
+    return YOLO(model_path)
+
+
 class AIAgentClient:
     """Kelas integrasi untuk inferensi model YOLOv8 dan modul penilaian AHSP Jawa Tengah."""
 
@@ -2426,7 +2433,7 @@ class AIAgentClient:
     ) -> Dict[str, Any]:
         """
         Memetakan hasil deteksi 4 kelas YOLOv8 (Crack, Efflorescence, Exposed Rebar, Spalling)
-        sesuai konteks Objek Inspeksi terpilih agar akurat baik untuk Struktur maupun Arsitektur.
+        agar konsisten dengan perilaku model awal sekaligus mendukung 5 objek Arsitektur & 3 Struktur.
         """
         if jenis_kerusakan_pilihan and "otomatis" not in jenis_kerusakan_pilihan.lower():
             item = AHSPKnowledgeBase.find_by_element_and_defect(elemen_gedung, jenis_kerusakan_pilihan)
@@ -2439,6 +2446,40 @@ class AIAgentClient:
 
         c_lower = str(class_name).lower()
         el_lower = elemen_gedung.lower()
+
+        # Mode Otomatis Penuh (identik dengan perilaku model YOLOv8 awal) atau deteksi beton eksplisit (Exposed Rebar / Spalling)
+        if "otomatis" in el_lower:
+            if "rebar" in c_lower:
+                base = dict(AHSPKnowledgeBase.CATALOG["A.4.1.1.20.JT"])
+                return {
+                    "kode_ahsp": base["kode"],
+                    "elemen_terkait": "Kolom Struktur Beton",
+                    "jenis_kerusakan": "Besi Tulangan Terbuka & Keropos Beton (Exposed Rebar)",
+                    "tingkat_keparahan": "Berat",
+                }
+            if "spalling" in c_lower:
+                base = dict(AHSPKnowledgeBase.CATALOG["A.4.1.1.20.JT"])
+                return {
+                    "kode_ahsp": base["kode"],
+                    "elemen_terkait": "Kolom Struktur Beton",
+                    "jenis_kerusakan": "Spalling / Keropos Beton & Selimut Terkelupas",
+                    "tingkat_keparahan": "Berat",
+                }
+            if "efflorescence" in c_lower:
+                item = AHSPKnowledgeBase.find_by_element_and_defect("Dinding dan Partisi", "Pengelupasan cat")
+                return {
+                    "kode_ahsp": item["kode"],
+                    "elemen_terkait": item["elemen_terkait"],
+                    "jenis_kerusakan": "Cat Dinding Mengelupas, Mengapur & Berjamur (Efflorescence)",
+                    "tingkat_keparahan": item["tingkat_keparahan"],
+                }
+            item = AHSPKnowledgeBase.find_by_element_and_defect("Dinding dan Partisi", "Retak rambut")
+            return {
+                "kode_ahsp": item["kode"],
+                "elemen_terkait": item["elemen_terkait"],
+                "jenis_kerusakan": item["jenis_kerusakan"],
+                "tingkat_keparahan": item["tingkat_keparahan"],
+            }
 
         if "lantai" in el_lower and "dak" not in el_lower:
             sub = "Pecah" if ("spalling" in c_lower or "rebar" in c_lower) else ("Berjamur" if "efflorescence" in c_lower else "Retak")
@@ -2453,7 +2494,21 @@ class AIAgentClient:
             sub = "Pecah" if ("crack" in c_lower or "spalling" in c_lower) else ("Jamur" if "efflorescence" in c_lower else "Karat")
             item = AHSPKnowledgeBase.find_by_element_and_defect("Atap", sub)
         elif "dinding" in el_lower or "partisi" in el_lower:
-            sub = "Jamur" if "efflorescence" in c_lower else ("Pengelupasan cat" if ("spalling" in c_lower or "rebar" in c_lower) else "Retak rambut")
+            if "rebar" in c_lower:
+                return {
+                    "kode_ahsp": "A.4.1.1.20.JT",
+                    "elemen_terkait": "Kolom Struktur Beton",
+                    "jenis_kerusakan": "Besi Tulangan Terbuka & Keropos Beton (Exposed Rebar)",
+                    "tingkat_keparahan": "Berat",
+                }
+            if "spalling" in c_lower:
+                return {
+                    "kode_ahsp": "A.4.1.1.20.JT",
+                    "elemen_terkait": "Kolom Struktur Beton",
+                    "jenis_kerusakan": "Spalling / Keropos Beton & Selimut Terkelupas",
+                    "tingkat_keparahan": "Berat",
+                }
+            sub = "Jamur" if "efflorescence" in c_lower else "Retak rambut"
             item = AHSPKnowledgeBase.find_by_element_and_defect("Dinding dan Partisi", sub)
         elif "balok" in el_lower or "kolom" in el_lower:
             el_label = "Balok Beton Bertulang" if "balok" in el_lower else "Kolom Struktur Beton"
@@ -2555,12 +2610,7 @@ class AIAgentClient:
             return None
 
         try:
-            from ultralytics import YOLO
-        except ImportError:
-            return None
-
-        try:
-            model = YOLO(model_path)
+            model = _load_yolo_model(model_path)
             img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
             results = model(img, conf=0.15, verbose=False)
             if not results or len(results) == 0:
@@ -3651,13 +3701,13 @@ if menu == "📊 Dashboard Utama & Input Data":
                     help="Masukkan nama ruangan atau zona lokasi inspeksi."
                 )
 
-            objek_options = list(AHSPKnowledgeBase.OBJEK_INSPEKSI_MAP.keys())
+            objek_options = ["Otomatis (Deteksi AI YOLOv8)"] + list(AHSPKnowledgeBase.OBJEK_INSPEKSI_MAP.keys())
             default_obj_idx = objek_options.index(st.session_state.get("inp_objek", objek_options[0])) if st.session_state.get("inp_objek") in objek_options else 0
             objek_inspeksi_pilihan = st.selectbox(
                 "Objek Inspeksi (Dapat Dipilih):",
                 objek_options,
                 index=default_obj_idx,
-                help="Pilih komponen Arsitektur atau Struktur yang sedang diperiksa."
+                help="Biarkan 'Otomatis (Deteksi AI YOLOv8)' agar model YOLOv8 mendeteksi jenis kerusakan secara langsung seperti semula, atau pilih elemen spesifik Arsitektur/Struktur."
             )
 
             col_id3, col_id4 = st.columns(2)
@@ -3775,6 +3825,7 @@ if menu == "📊 Dashboard Utama & Input Data":
             f"2. Jenis Kerusakan ({objek_inspeksi_pilihan}):",
             sub_kerusakan_opts,
             index=0,
+            key=f"jenis_kerusakan_sel_{objek_inspeksi_pilihan}",
             help="Biarkan 'Deteksi Otomatis AI' agar model YOLOv8 mengklasifikasikan kerusakan dari foto secara otomatis, atau pilih sub-jenis kerusakan spesifik jika ingin menentukan manual."
         )
 
