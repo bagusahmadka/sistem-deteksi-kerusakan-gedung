@@ -2176,6 +2176,13 @@ class AHSPKnowledgeBase:
                 return base
 
         if sub_clean and "otomatis" not in sub_clean:
+            if "otomatis" in el_clean:
+                if any(k in sub_clean for k in ("tulangan", "rebar", "spalling", "keropos")):
+                    return cls.CATALOG["A.4.1.1.20.JT"]
+                for item in cls.CATALOG.values():
+                    item_sub = item["sub_kerusakan"].lower()
+                    if sub_clean == item_sub or sub_clean in item_sub or item_sub in sub_clean:
+                        return item
             for item in cls.CATALOG.values():
                 item_el = item["elemen_terkait"].lower()
                 item_sub = item["sub_kerusakan"].lower()
@@ -2380,8 +2387,8 @@ class AIAgentClient:
         return None
 
     @classmethod
-    def _infer_visual_subdefect_fallback(cls, image_bytes: bytes, elemen_gedung: str) -> str:
-        """Heuristik fitur visual citra (warna karat/jamur/noda air/kontras tepi) bila YOLO tidak mengeluarkan box."""
+    def _analyze_visual_features(cls, image_bytes: bytes) -> Optional[Dict[str, Any]]:
+        """Mengekstrak fitur statistik warna, kecerahan, tekstur tepi, dan kekontrasan blok citra."""
         try:
             import numpy as np
             arr = np.array(Image.open(io.BytesIO(image_bytes)).convert("RGB").resize((160, 160)), dtype=np.float32)
@@ -2391,27 +2398,125 @@ class AIAgentClient:
             gy = np.abs(np.diff(gray, axis=0)).mean()
             edge_score = float(gx + gy)
             dark_ratio = float((gray < 78).mean())
-            rust_ratio = float(((r > g + 16) & (r > b + 26) & (r > 75)).mean())
+            # Pisahkan karat besi tua / tulangan terekspos (gelap & kecokelatan) dari cat pink/krem/kulit terang
+            oxide_rust_ratio = float(((r > g + 16) & (r > b + 26) & (gray < 140) & (b < 95)).mean())
             warm_stain_ratio = float(((r > b + 15) & (g > b + 8) & (gray < 190)).mean())
             green_mold_ratio = float(((g >= r) & (g > b + 8) & (gray < 165)).mean())
             bright_ratio = float((gray > 205).mean())
             std_lum = float(gray.std())
+
+            maxc = np.maximum(np.maximum(r, g), b)
+            minc = np.minimum(np.minimum(r, g), b)
+            sat = (maxc - minc) / (maxc + 1e-5)
+            p10, p90 = np.percentile(gray, [10, 90])
+            s10, s90 = np.percentile(sat, [10, 90])
+            blk_g = np.array([gray[i * 40:(i + 1) * 40, j * 40:(j + 1) * 40].mean() for i in range(4) for j in range(4)])
+            blk_rb = np.array([(r[i * 40:(i + 1) * 40, j * 40:(j + 1) * 40] - b[i * 40:(i + 1) * 40, j * 40:(j + 1) * 40]).mean() for i in range(4) for j in range(4)])
+            blk_g_std = float(blk_g.std())
+            blk_rb_std = float(blk_rb.std())
+            p90_10 = float(p90 - p10)
+            sat_spread = float(s90 - s10)
+            tinted_ratio = float((sat >= 0.12).mean())
+            neutral_ratio = float((sat < 0.12).mean())
+
+            # Deteksi khas cat terkelupas: dua lapisan berbeda (cat berwarna/putih vs acian/plester) dengan sebaran blok kontras
+            is_peeling_paint = (
+                oxide_rust_ratio <= 0.09
+                and green_mold_ratio <= 0.10
+                and (
+                    (blk_g_std >= 16.0 and p90_10 >= 45.0 and (sat_spread >= 0.14 or blk_rb_std >= 11.0 or (tinted_ratio >= 0.25 and neutral_ratio >= 0.20)))
+                    or (blk_g_std >= 15.0 and p90_10 >= 45.0 and bright_ratio >= 0.20 and std_lum >= 24.0)
+                    or (blk_g_std >= 10.0 and ((bright_ratio > 0.35 and std_lum >= 20.0) or warm_stain_ratio > 0.25))
+                )
+            )
+            return {
+                "edge_score": edge_score,
+                "dark_ratio": dark_ratio,
+                "rust_ratio": oxide_rust_ratio,
+                "warm_stain_ratio": warm_stain_ratio,
+                "green_mold_ratio": green_mold_ratio,
+                "bright_ratio": bright_ratio,
+                "std_lum": std_lum,
+                "blk_g_std": blk_g_std,
+                "blk_rb_std": blk_rb_std,
+                "p90_10": p90_10,
+                "sat_spread": sat_spread,
+                "is_peeling_paint": bool(is_peeling_paint),
+            }
         except Exception:
+            return None
+
+    @classmethod
+    def _extract_visual_anomaly_box(cls, image_bytes: bytes) -> List[int]:
+        """Menentukan region bounding box anomali visual terkuat jika YOLO tidak menghasilkan deteksi."""
+        img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+        w, h = img.size
+        fallback_box = [int(w * 0.18), int(h * 0.22), int(w * 0.82), int(h * 0.78)]
+        try:
+            import numpy as np
+            arr = np.array(img.resize((160, 160)), dtype=np.float32)
+            # Gunakan tepi gambar sebagai referensi warna dinding/permukaan normal
+            border = np.concatenate([arr[0, :, :], arr[-1, :, :], arr[:, 0, :], arr[:, -1, :]], axis=0)
+            ref_rgb = np.median(border, axis=0)
+            color_dev = np.linalg.norm(arr - ref_rgb, axis=2)
+
+            gray = 0.299 * arr[:, :, 0] + 0.587 * arr[:, :, 1] + 0.114 * arr[:, :, 2]
+            gx = np.abs(np.diff(gray, axis=1, prepend=gray[:, :1]))
+            gy = np.abs(np.diff(gray, axis=0, prepend=gray[:1, :]))
+            score_map = color_dev + 0.8 * (gx + gy)
+
+            grid_rows, grid_cols = 8, 8
+            cell_h, cell_w = 160 // grid_rows, 160 // grid_cols
+            grid_scores = np.array([
+                [score_map[r_i * cell_h:(r_i + 1) * cell_h, c_i * cell_w:(c_i + 1) * cell_w].mean()
+                 for c_i in range(grid_cols)]
+                for r_i in range(grid_rows)
+            ])
+            thresh = max(float(np.percentile(grid_scores, 65)), float(grid_scores.mean() + 0.25 * grid_scores.std()))
+            active = np.argwhere(grid_scores >= thresh)
+            if len(active) == 0:
+                return fallback_box
+            r_min, c_min = active.min(axis=0)
+            r_max, c_max = active.max(axis=0)
+            x1 = max(int(w * 0.04), int((c_min / grid_cols) * w))
+            y1 = max(int(h * 0.04), int((r_min / grid_rows) * h))
+            x2 = min(int(w * 0.96), int(((c_max + 1) / grid_cols) * w))
+            y2 = min(int(h * 0.96), int(((r_max + 1) / grid_rows) * h))
+            if (x2 - x1) < int(w * 0.20) or (y2 - y1) < int(h * 0.20):
+                return fallback_box
+            return [x1, y1, x2, y2]
+        except Exception:
+            return fallback_box
+
+    @classmethod
+    def _infer_visual_subdefect_fallback(cls, image_bytes: bytes, elemen_gedung: str) -> str:
+        """Heuristik fitur visual citra (warna karat/jamur/pengelupasan cat/noda air/kontras tepi) bila YOLO tidak mengeluarkan box."""
+        feats = cls._analyze_visual_features(image_bytes)
+        if not feats:
             return ""
+        edge_score = feats["edge_score"]
+        dark_ratio = feats["dark_ratio"]
+        rust_ratio = feats["rust_ratio"]
+        warm_stain_ratio = feats["warm_stain_ratio"]
+        green_mold_ratio = feats["green_mold_ratio"]
+        bright_ratio = feats["bright_ratio"]
+        std_lum = feats["std_lum"]
+        p90_10 = feats["p90_10"]
+        is_peeling_paint = feats["is_peeling_paint"]
 
         el = elemen_gedung.lower()
         if "otomatis" in el:
-            if rust_ratio > 0.10 or (dark_ratio > 0.28 and edge_score > 22):
+            if rust_ratio > 0.09 or (dark_ratio > 0.28 and edge_score > 22):
                 return "Tulangan Terbuka (Exposed Rebar)"
-            if green_mold_ratio > 0.12 or dark_ratio > 0.24:
+            if green_mold_ratio > 0.10 or dark_ratio > 0.24:
                 return "Jamur"
-            if bright_ratio > 0.35 or warm_stain_ratio > 0.25:
+            if is_peeling_paint:
                 return "Pengelupasan cat"
             return "Retak rambut"
         if "dinding" in el or "partisi" in el:
             if green_mold_ratio > 0.10 or dark_ratio > 0.22:
                 return "Jamur"
-            if rust_ratio > 0.15 or (std_lum > 48 and bright_ratio > 0.25):
+            if is_peeling_paint or rust_ratio > 0.15 or (std_lum > 48 and bright_ratio > 0.25):
                 return "Pengelupasan cat"
             return "Retak rambut" if edge_score > 16 else "Cat menggelembung"
         if "plafon" in el:
@@ -2449,7 +2554,7 @@ class AIAgentClient:
         if "balok" in el or "kolom" in el:
             if rust_ratio > 0.09 or dark_ratio > 0.25:
                 return "Tulangan Terbuka (Exposed Rebar)"
-            return "Retak Struktur (Crack)" if edge_score > 15 else "Spalling / Keropos"
+            return "Spalling / Keropos" if (p90_10 > 35.0 or dark_ratio > 0.18) else "Retak Struktur (Crack)"
         if "dak" in el or "pelat" in el:
             if rust_ratio > 0.12 or dark_ratio > 0.26:
                 return "Spalling Bawah Pelat"
@@ -2711,27 +2816,68 @@ class AIAgentClient:
                         "kode_ahsp": ahsp_map["kode_ahsp"]
                     })
 
-            if not boxes_data:
+            vis_feats = cls._analyze_visual_features(image_bytes) or {}
+            el_lower = elemen_gedung.lower()
+            is_auto_or_wall = ("otomatis" in el_lower or "dinding" in el_lower or "partisi" in el_lower)
+            is_manual_override = bool(jenis_kerusakan_pilihan and "otomatis" not in jenis_kerusakan_pilihan.lower())
+
+            # Jika YOLOv8 hanya menghasilkan sinyal lemah (< 32%) non-rebar pada citra cat terkelupas,
+            # utamakan klasifikasi visual Pengelupasan Cat agar lipatan cat tidak dikira retak rambut.
+            max_yolo_conf = max((b["confidence"] for b in boxes_data), default=0.0)
+            has_rebar_or_eff = any(
+                "rebar" in str(b.get("class_name", "")).lower() or "efflorescence" in str(b.get("class_name", "")).lower()
+                for b in boxes_data
+            )
+            weak_false_crack = (
+                bool(boxes_data)
+                and not is_manual_override
+                and is_auto_or_wall
+                and max_yolo_conf < 38.0
+                and not has_rebar_or_eff
+                and bool(vis_feats.get("is_peeling_paint"))
+            )
+
+            if (not boxes_data) or weak_false_crack:
                 sub_fallback = jenis_kerusakan_pilihan
                 if not sub_fallback or "otomatis" in sub_fallback.lower():
-                    sub_fallback = cls._infer_visual_subdefect_fallback(image_bytes, elemen_gedung)
-                el_lookup = (
-                    "Struktur - Kolom Struktur Beton"
-                    if "tulangan" in sub_fallback.lower() or "spalling" in sub_fallback.lower()
-                    else elemen_gedung
-                )
+                    sub_fallback = "Pengelupasan cat" if weak_false_crack else cls._infer_visual_subdefect_fallback(image_bytes, elemen_gedung)
+                el_lookup = cls._resolve_fallback_element(elemen_gedung, sub_fallback)
                 ahsp_item = AHSPKnowledgeBase.find_by_element_and_defect(el_lookup, sub_fallback)
+                vis_box = cls._extract_visual_anomaly_box(image_bytes)
+                vis_eval = compute_condition_assessment({
+                    "elemen_gedung": ahsp_item["elemen_terkait"],
+                    "jenis_kerusakan": ahsp_item["jenis_kerusakan"],
+                    "kode_ahsp": ahsp_item["kode"],
+                    "volume": volume,
+                    "luas_total": luas_total,
+                })
+                vis_conf = 74.5 if vis_feats.get("is_peeling_paint") else 68.0
+                heuristic_boxes = [{
+                    "box": vis_box,
+                    "class_name": "VisualFeature",
+                    "label": f"{ahsp_item['jenis_kerusakan']} [Analisis Visual]",
+                    "elemen_terkait": ahsp_item["elemen_terkait"],
+                    "confidence": vis_conf,
+                    "keparahan": vis_eval["keparahan"],
+                    "kode_ahsp": ahsp_item["kode"],
+                }]
+                warn_reason = (
+                    f"Model YOLOv8 ({os.path.basename(model_path)}) hanya terlatih pada 4 kelas beton "
+                    f"(Crack, Efflorescence, Exposed Rebar, Spalling) dan tidak memiliki kelas khusus kerusakan arsitektur "
+                    f"seperti cat terkelupas. Sistem menggunakan Analisis Fitur Visual dan memetakan sebagai "
+                    f"'{ahsp_item['jenis_kerusakan']}'. Bila tidak sesuai, silakan pilih manual pada dropdown '2. Jenis Kerusakan'."
+                )
                 return cls._build_analysis_result(
                     ahsp_item=ahsp_item,
                     volume=volume,
                     luas_total=luas_total,
                     filename=filename,
-                    mode_label=f"YOLOv8 Engine ({os.path.basename(model_path)})",
-                    agent_id="yolov8-custom-model-engine",
+                    mode_label=f"YOLOv8 + Visual Feature Fallback ({os.path.basename(model_path)})",
+                    agent_id="yolov8-visual-fallback-engine",
                     is_yolo_active=True,
-                    confidence_score=95.0,
-                    detected_boxes=[],
-                    warning=f"Model YOLOv8 ({os.path.basename(model_path)}) memindai citra dan memetakan parameter kerusakan pada elemen terpilih."
+                    confidence_score=vis_conf,
+                    detected_boxes=heuristic_boxes,
+                    warning=warn_reason,
                 )
 
             critical_boxes = [
@@ -2766,6 +2912,18 @@ class AIAgentClient:
             return None
 
     @classmethod
+    def _resolve_fallback_element(cls, elemen_gedung: str, sub_defect: str) -> str:
+        """Memetakan elemen target hanya ke Kolom Beton saat mode Otomatis mendeteksi cacat beton kritis."""
+        el_l = str(elemen_gedung).lower()
+        sub_l = str(sub_defect).lower()
+        if "otomatis" in el_l:
+            if "tulangan" in sub_l or "spalling" in sub_l:
+                return "Struktur - Kolom Struktur Beton"
+            if any(w in sub_l for w in ("cat", "jamur", "retak rambut")):
+                return "Arsitektur - Dinding dan Partisi"
+        return elemen_gedung
+
+    @classmethod
     def _deterministic_civil_ai_engine(
         cls,
         elemen_gedung: str,
@@ -2780,11 +2938,7 @@ class AIAgentClient:
         sub_target = jenis_kerusakan_pilihan
         if (not sub_target or "otomatis" in sub_target.lower()) and image_bytes:
             sub_target = cls._infer_visual_subdefect_fallback(image_bytes, elemen_gedung) or sub_target
-        el_lookup = (
-            "Struktur - Kolom Struktur Beton"
-            if "tulangan" in str(sub_target).lower() or "spalling" in str(sub_target).lower()
-            else elemen_gedung
-        )
+        el_lookup = cls._resolve_fallback_element(elemen_gedung, sub_target)
         ahsp_item = AHSPKnowledgeBase.find_by_element_and_defect(el_lookup, sub_target)
         return cls._build_analysis_result(
             ahsp_item=ahsp_item,
@@ -4136,6 +4290,9 @@ if menu == "📊 Dashboard Utama & Input Data":
         else:
             engine_label = res.get("mode", "YOLOv8 & Civil Vision Engine")
             st.success(f"🟢 **Status Engine:** {engine_label} (Mode Analisis Mandiri Aktif) | ID Riwayat DB: #{res.get('db_id')}")
+
+        if res.get("warning"):
+            st.warning(f"ℹ️ **Catatan Akurasi Model AI:** {res.get('warning')}")
 
         st.markdown("### 📊 Hasil Penilaian Kondisi & Estimasi Biaya Pemeliharaan")
 
