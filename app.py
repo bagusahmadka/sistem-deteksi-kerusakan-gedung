@@ -2482,16 +2482,51 @@ class AIAgentClient:
             }
 
         if "lantai" in el_lower and "dak" not in el_lower:
-            sub = "Pecah" if ("spalling" in c_lower or "rebar" in c_lower) else ("Berjamur" if "efflorescence" in c_lower else "Retak")
+            if "rebar" in c_lower:
+                return {
+                    "kode_ahsp": "A.4.1.1.20.JT",
+                    "elemen_terkait": "Pelat Lantai / Struktur Beton",
+                    "jenis_kerusakan": "Besi Tulangan Terbuka & Keropos Beton (Exposed Rebar)",
+                    "tingkat_keparahan": "Berat",
+                }
+            sub = "Pecah" if "spalling" in c_lower else ("Berjamur" if "efflorescence" in c_lower else "Retak")
             item = AHSPKnowledgeBase.find_by_element_and_defect("Lantai", sub)
         elif "plafon" in el_lower:
-            sub = "Rusak" if ("spalling" in c_lower or "rebar" in c_lower) else ("Kebocoran" if "efflorescence" in c_lower else "Retak")
+            if "rebar" in c_lower:
+                return {
+                    "kode_ahsp": "A.4.1.1.20.JT",
+                    "elemen_terkait": "Pelat Lantai / Dak Beton",
+                    "jenis_kerusakan": "Besi Tulangan Terbuka & Keropos Beton (Exposed Rebar)",
+                    "tingkat_keparahan": "Berat",
+                }
+            sub = "Rusak" if "spalling" in c_lower else ("Kebocoran" if "efflorescence" in c_lower else "Retak")
             item = AHSPKnowledgeBase.find_by_element_and_defect("Plafon", sub)
         elif "pintu" in el_lower or "jendela" in el_lower:
-            sub = "Kaca retak" if "crack" in c_lower else ("Pelapukan" if ("spalling" in c_lower or "rebar" in c_lower) else "Karat")
+            if "rebar" in c_lower:
+                return {
+                    "kode_ahsp": "A.4.1.1.20.JT",
+                    "elemen_terkait": "Kolom Struktur Beton",
+                    "jenis_kerusakan": "Besi Tulangan Terbuka & Keropos Beton (Exposed Rebar)",
+                    "tingkat_keparahan": "Berat",
+                }
+            sub = "Kaca retak" if "crack" in c_lower else ("Pelapukan" if "spalling" in c_lower else "Karat")
             item = AHSPKnowledgeBase.find_by_element_and_defect("Pintu dan Jendela", sub)
         elif "atap" in el_lower and "dak" not in el_lower:
-            sub = "Pecah" if ("crack" in c_lower or "spalling" in c_lower) else ("Jamur" if "efflorescence" in c_lower else "Karat")
+            if "rebar" in c_lower:
+                return {
+                    "kode_ahsp": "A.4.1.1.20.JT",
+                    "elemen_terkait": "Pelat Atap / Dak Beton",
+                    "jenis_kerusakan": "Besi Tulangan Terbuka & Keropos Beton (Exposed Rebar)",
+                    "tingkat_keparahan": "Berat",
+                }
+            if "spalling" in c_lower:
+                return {
+                    "kode_ahsp": "A.4.1.1.20.JT",
+                    "elemen_terkait": "Pelat Atap / Dak Beton",
+                    "jenis_kerusakan": "Spalling / Keropos Beton & Selimut Terkelupas",
+                    "tingkat_keparahan": "Berat",
+                }
+            sub = "Pecah" if "crack" in c_lower else ("Jamur" if "efflorescence" in c_lower else "Karat")
             item = AHSPKnowledgeBase.find_by_element_and_defect("Atap", sub)
         elif "dinding" in el_lower or "partisi" in el_lower:
             if "rebar" in c_lower:
@@ -2665,7 +2700,13 @@ class AIAgentClient:
                     warning=f"Model YOLOv8 ({os.path.basename(model_path)}) memindai citra dan memetakan parameter kerusakan pada elemen terpilih."
                 )
 
-            main_box = max(boxes_data, key=lambda x: x["confidence"])
+            critical_boxes = [
+                b for b in boxes_data
+                if (not jenis_kerusakan_pilihan or "otomatis" in jenis_kerusakan_pilihan.lower())
+                and b["kode_ahsp"] == "A.4.1.1.20.JT"
+                and b["confidence"] >= 30.0
+            ]
+            main_box = max(critical_boxes, key=lambda x: x["confidence"]) if critical_boxes else max(boxes_data, key=lambda x: x["confidence"])
             ahsp_item = AHSPKnowledgeBase.get_by_code(main_box["kode_ahsp"]) or AHSPKnowledgeBase.find_by_element_and_defect(elemen_gedung, jenis_kerusakan_pilihan)
             return cls._build_analysis_result(
                 ahsp_item=ahsp_item,
@@ -2782,7 +2823,8 @@ def compute_condition_assessment(item: Dict[str, Any]) -> Dict[str, Any]:
     k_lower = str(kerusakan).lower()
     if is_struktural and kode in ("A.4.1.1.20.JT", "A.4.1.1.18.JT"):
         if kode == "A.4.1.1.20.JT" or any(w in k_lower for w in ("rebar", "tulangan", "spalling", "keropos")):
-            keparahan = "Berat" if persentase_kerusakan > 1.5 else "Sedang"
+            is_exposed_rebar = any(w in k_lower for w in ("rebar", "tulangan"))
+            keparahan = "Berat" if (is_exposed_rebar or persentase_kerusakan > 1.0) else "Sedang"
             if keparahan == "Berat":
                 skor_fisik = min(skor_fisik, 48.0)
                 skor_fungsi = min(skor_fungsi, 48.0)
