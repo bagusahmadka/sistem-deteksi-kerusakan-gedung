@@ -8,6 +8,7 @@ Framework: Streamlit | AI Model: YOLOv8 Computer Vision | Database: SQLite3 | Ek
 
 import os
 import io
+import html
 import json
 import base64
 import sqlite3
@@ -4422,15 +4423,14 @@ if menu == "📊 Dashboard Utama & Input Data":
         st.markdown("#### 🛠️ Langkah-Langkah Perbaikan & Metode Kerja Standar")
         steps_list = res.get("langkah_kerja", [])
         if steps_list:
-            cards_html = '<div class="repair-steps-grid">'
-            for idx, step in enumerate(steps_list, start=1):
-                cards_html += f"""
-                <div class="repair-step-card">
-                    <div class="repair-step-badge">TAHAP {idx}</div>
-                    <div class="repair-step-body">{step}</div>
-                </div>
-                """
-            cards_html += "</div>"
+            cards_items = "".join(
+                f'<div class="repair-step-card">'
+                f'<div class="repair-step-badge">TAHAP {idx}</div>'
+                f'<div class="repair-step-body">{html.escape(str(step))}</div>'
+                f'</div>'
+                for idx, step in enumerate(steps_list, start=1)
+            )
+            cards_html = f'<div class="repair-steps-grid">{cards_items}</div>'
             st.markdown(cards_html, unsafe_allow_html=True)
 
         st.info(f"💡 **Rekomendasi Pemeliharaan Teknis:** {res.get('rekomendasi')}")
