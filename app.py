@@ -1012,6 +1012,8 @@ class DatabaseManager:
                 cursor.execute("ALTER TABLE riwayat_kerusakan ADD COLUMN luas_total REAL DEFAULT 25.0")
             if "persentase_kerusakan" not in cols:
                 cursor.execute("ALTER TABLE riwayat_kerusakan ADD COLUMN persentase_kerusakan REAL DEFAULT 10.0")
+            if "tingkat_keparahan" not in cols:
+                cursor.execute("ALTER TABLE riwayat_kerusakan ADD COLUMN tingkat_keparahan TEXT DEFAULT 'Sedang'")
             conn.commit()
 
     @classmethod
@@ -1032,7 +1034,8 @@ class DatabaseManager:
         koordinat_lokasi: str = "-",
         objek_inspeksi: str = "Arsitektur",
         luas_total: float = 25.0,
-        persentase_kerusakan: float = 10.0
+        persentase_kerusakan: float = 10.0,
+        tingkat_keparahan: str = "Sedang"
     ) -> int:
         """Menyimpan data penilaian kondisi kerusakan gedung ke SQLite."""
         with cls.get_connection() as conn:
@@ -1043,14 +1046,14 @@ class DatabaseManager:
                     koordinat_lokasi, objek_inspeksi,
                     elemen_gedung, jenis_kerusakan, kode_ahsp,
                     volume, satuan, harga_satuan, total_biaya, rekomendasi,
-                    luas_total, persentase_kerusakan
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    luas_total, persentase_kerusakan, tingkat_keparahan
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 tanggal, nama_gedung, lokasi_lantai, surveyor,
                 koordinat_lokasi, objek_inspeksi,
                 elemen_gedung, jenis_kerusakan, kode_ahsp,
                 volume, satuan, int(harga_satuan), int(total_biaya), rekomendasi,
-                float(luas_total), float(persentase_kerusakan)
+                float(luas_total), float(persentase_kerusakan), str(tingkat_keparahan)
             ))
             conn.commit()
             return cursor.lastrowid
@@ -2302,7 +2305,8 @@ class AIAgentClient:
         if force_simulation:
             return cls._deterministic_civil_ai_engine(
                 elemen_gedung, volume, filename, "Simulasi Mandiri (Offline Safe)",
-                luas_total=luas_total, jenis_kerusakan_pilihan=jenis_kerusakan_pilihan
+                luas_total=luas_total, jenis_kerusakan_pilihan=jenis_kerusakan_pilihan,
+                image_bytes=image_bytes
             )
 
         # 2. Jalankan inferensi model YOLOv8 kustom (weights/best.pt)
@@ -2317,7 +2321,8 @@ class AIAgentClient:
         if model_path:
             fallback = cls._deterministic_civil_ai_engine(
                 elemen_gedung, volume, filename, "Standalone Civil AI Engine",
-                luas_total=luas_total, jenis_kerusakan_pilihan=jenis_kerusakan_pilihan
+                luas_total=luas_total, jenis_kerusakan_pilihan=jenis_kerusakan_pilihan,
+                image_bytes=image_bytes
             )
             try:
                 import ultralytics  # noqa: F401
@@ -2339,21 +2344,24 @@ class AIAgentClient:
                     return result
                 fallback = cls._deterministic_civil_ai_engine(
                     elemen_gedung, volume, filename, f"HTTP Error {response.status_code}",
-                    luas_total=luas_total, jenis_kerusakan_pilihan=jenis_kerusakan_pilihan
+                    luas_total=luas_total, jenis_kerusakan_pilihan=jenis_kerusakan_pilihan,
+                    image_bytes=image_bytes
                 )
                 fallback["warning"] = f"Endpoint merespons status {response.status_code}. Beralih ke Standalone Engine."
                 return fallback
             except Exception as exc:
                 fallback = cls._deterministic_civil_ai_engine(
                     elemen_gedung, volume, filename, "Standalone Engine (Auto-Fallback)",
-                    luas_total=luas_total, jenis_kerusakan_pilihan=jenis_kerusakan_pilihan
+                    luas_total=luas_total, jenis_kerusakan_pilihan=jenis_kerusakan_pilihan,
+                    image_bytes=image_bytes
                 )
                 fallback["warning"] = f"Koneksi endpoint '{target_url}' tidak merespons ({type(exc).__name__}). Dialihkan ke Standalone Civil AI Engine."
                 return fallback
 
         return cls._deterministic_civil_ai_engine(
             elemen_gedung, volume, filename, "Standalone Civil AI Engine",
-            luas_total=luas_total, jenis_kerusakan_pilihan=jenis_kerusakan_pilihan
+            luas_total=luas_total, jenis_kerusakan_pilihan=jenis_kerusakan_pilihan,
+            image_bytes=image_bytes
         )
 
     @classmethod
@@ -2372,59 +2380,79 @@ class AIAgentClient:
 
     @classmethod
     def _infer_visual_subdefect_fallback(cls, image_bytes: bytes, elemen_gedung: str) -> str:
-        """Heuristik fitur visual citra (warna karat/jamur/kontras tepi) jika model YOLO tidak mengeluarkan box."""
+        """Heuristik fitur visual citra (warna karat/jamur/noda air/kontras tepi) bila YOLO tidak mengeluarkan box."""
         try:
             import numpy as np
             arr = np.array(Image.open(io.BytesIO(image_bytes)).convert("RGB").resize((160, 160)), dtype=np.float32)
             r, g, b = arr[:, :, 0], arr[:, :, 1], arr[:, :, 2]
             gray = 0.299 * r + 0.587 * g + 0.114 * b
-            # Edge density (proxy retak/pecah), dark stains (jamur/kotor), rust/brownish (karat/tulangan)
             gx = np.abs(np.diff(gray, axis=1)).mean()
             gy = np.abs(np.diff(gray, axis=0)).mean()
-            edge_score = gx + gy
-            dark_ratio = float((gray < 75).mean())
-            rust_ratio = float(((r > g + 18) & (r > b + 28) & (r > 80)).mean())
+            edge_score = float(gx + gy)
+            dark_ratio = float((gray < 78).mean())
+            rust_ratio = float(((r > g + 16) & (r > b + 26) & (r > 75)).mean())
+            warm_stain_ratio = float(((r > b + 15) & (g > b + 8) & (gray < 190)).mean())
+            green_mold_ratio = float(((g >= r) & (g > b + 8) & (gray < 165)).mean())
             bright_ratio = float((gray > 205).mean())
+            std_lum = float(gray.std())
         except Exception:
             return ""
 
         el = elemen_gedung.lower()
-        if "dinding" in el or "partisi" in el:
-            if dark_ratio > 0.22:
+        if "otomatis" in el:
+            if rust_ratio > 0.10 or (dark_ratio > 0.28 and edge_score > 22):
+                return "Tulangan Terbuka (Exposed Rebar)"
+            if green_mold_ratio > 0.12 or dark_ratio > 0.24:
                 return "Jamur"
-            if rust_ratio > 0.15 or bright_ratio > 0.35:
+            if bright_ratio > 0.35 or warm_stain_ratio > 0.25:
+                return "Pengelupasan cat"
+            return "Retak rambut"
+        if "dinding" in el or "partisi" in el:
+            if green_mold_ratio > 0.10 or dark_ratio > 0.22:
+                return "Jamur"
+            if rust_ratio > 0.15 or (std_lum > 48 and bright_ratio > 0.25):
                 return "Pengelupasan cat"
             return "Retak rambut" if edge_score > 16 else "Cat menggelembung"
         if "plafon" in el:
-            if dark_ratio > 0.20:
+            if green_mold_ratio > 0.10 or dark_ratio > 0.20:
                 return "Jamur"
-            if rust_ratio > 0.12:
+            if warm_stain_ratio > 0.16 or rust_ratio > 0.10:
                 return "Kebocoran"
             return "Retak" if edge_score > 18 else "Rusak"
         if "pintu" in el or "jendela" in el:
-            if rust_ratio > 0.14:
+            if rust_ratio > 0.12:
                 return "Karat"
-            if edge_score > 24:
+            if edge_score > 25:
                 return "Kaca retak"
-            return "Pelapukan" if dark_ratio > 0.22 else "Kotor"
+            if dark_ratio > 0.22 or green_mold_ratio > 0.08:
+                return "Pelapukan"
+            return "Kotor" if std_lum < 38 else "Sealent"
         if "lantai" in el and "dak" not in el:
-            if dark_ratio > 0.22:
+            if green_mold_ratio > 0.10 or dark_ratio > 0.22:
                 return "Berjamur"
             if edge_score > 24:
                 return "Pecah"
-            return "Retak" if edge_score > 16 else "Kotor"
+            if edge_score > 16:
+                return "Retak"
+            if std_lum > 52:
+                return "Gumpil"
+            return "Kotor" if warm_stain_ratio > 0.12 else "Popping"
         if "atap" in el and "dak" not in el:
-            if rust_ratio > 0.14:
+            if rust_ratio > 0.12:
                 return "Karat"
-            if dark_ratio > 0.22:
+            if green_mold_ratio > 0.10 or dark_ratio > 0.22:
                 return "Jamur"
-            return "Pecah" if edge_score > 20 else "Bocor"
+            if edge_score > 20:
+                return "Pecah"
+            return "Bocor" if warm_stain_ratio > 0.15 else "Kotor"
         if "balok" in el or "kolom" in el:
-            if rust_ratio > 0.10 or dark_ratio > 0.25:
+            if rust_ratio > 0.09 or dark_ratio > 0.25:
                 return "Tulangan Terbuka (Exposed Rebar)"
             return "Retak Struktur (Crack)" if edge_score > 15 else "Spalling / Keropos"
         if "dak" in el or "pelat" in el:
-            return "Rembesan / Bocor & Efflorescence"
+            if rust_ratio > 0.12 or dark_ratio > 0.26:
+                return "Spalling Bawah Pelat"
+            return "Retak Pelat Beton" if edge_score > 20 else "Rembesan / Bocor & Efflorescence"
         return ""
 
     @classmethod
@@ -2686,7 +2714,12 @@ class AIAgentClient:
                 sub_fallback = jenis_kerusakan_pilihan
                 if not sub_fallback or "otomatis" in sub_fallback.lower():
                     sub_fallback = cls._infer_visual_subdefect_fallback(image_bytes, elemen_gedung)
-                ahsp_item = AHSPKnowledgeBase.find_by_element_and_defect(elemen_gedung, sub_fallback)
+                el_lookup = (
+                    "Struktur - Kolom Struktur Beton"
+                    if "tulangan" in sub_fallback.lower() or "spalling" in sub_fallback.lower()
+                    else elemen_gedung
+                )
+                ahsp_item = AHSPKnowledgeBase.find_by_element_and_defect(el_lookup, sub_fallback)
                 return cls._build_analysis_result(
                     ahsp_item=ahsp_item,
                     volume=volume,
@@ -2704,9 +2737,16 @@ class AIAgentClient:
                 b for b in boxes_data
                 if (not jenis_kerusakan_pilihan or "otomatis" in jenis_kerusakan_pilihan.lower())
                 and b["kode_ahsp"] == "A.4.1.1.20.JT"
-                and b["confidence"] >= 30.0
+                and b["confidence"] >= 25.0
             ]
-            main_box = max(critical_boxes, key=lambda x: x["confidence"]) if critical_boxes else max(boxes_data, key=lambda x: x["confidence"])
+            if critical_boxes:
+                # Selaraskan status kotak pendukung pada elemen beton yang mengalami Exposed Rebar/Spalling
+                for b in boxes_data:
+                    if b["keparahan"] == "Ringan":
+                        b["keparahan"] = "Berat" if "rebar" in str(b.get("class_name", "")).lower() or b["confidence"] >= 60.0 else "Sedang"
+                main_box = max(critical_boxes, key=lambda x: x["confidence"])
+            else:
+                main_box = max(boxes_data, key=lambda x: x["confidence"])
             ahsp_item = AHSPKnowledgeBase.get_by_code(main_box["kode_ahsp"]) or AHSPKnowledgeBase.find_by_element_and_defect(elemen_gedung, jenis_kerusakan_pilihan)
             return cls._build_analysis_result(
                 ahsp_item=ahsp_item,
@@ -2732,10 +2772,19 @@ class AIAgentClient:
         filename: str,
         mode_label: str,
         luas_total: float = 25.0,
-        jenis_kerusakan_pilihan: str = "Deteksi Otomatis AI"
+        jenis_kerusakan_pilihan: str = "Deteksi Otomatis AI",
+        image_bytes: bytes = b""
     ) -> Dict[str, Any]:
         """Mesin analisis teknik sipil berbasis katalog AHSP Jateng 2023 dan rasio prosentase kerusakan."""
-        ahsp_item = AHSPKnowledgeBase.find_by_element_and_defect(elemen_gedung, jenis_kerusakan_pilihan)
+        sub_target = jenis_kerusakan_pilihan
+        if (not sub_target or "otomatis" in sub_target.lower()) and image_bytes:
+            sub_target = cls._infer_visual_subdefect_fallback(image_bytes, elemen_gedung) or sub_target
+        el_lookup = (
+            "Struktur - Kolom Struktur Beton"
+            if "tulangan" in str(sub_target).lower() or "spalling" in str(sub_target).lower()
+            else elemen_gedung
+        )
+        ahsp_item = AHSPKnowledgeBase.find_by_element_and_defect(el_lookup, sub_target)
         return cls._build_analysis_result(
             ahsp_item=ahsp_item,
             volume=volume,
@@ -2844,12 +2893,29 @@ def compute_condition_assessment(item: Dict[str, Any]) -> Dict[str, Any]:
         total_kinerja = round(kinerja_f + kinerja_fn, 1)
     elif is_struktural and persentase_kerusakan > 25.0:
         keparahan = "Berat"
+        skor_fisik = min(skor_fisik, 48.0)
+        skor_fungsi = min(skor_fungsi, 50.0)
+        kinerja_f = round(0.5 * skor_fisik, 1)
+        kinerja_fn = round(0.5 * skor_fungsi, 1)
+        total_kinerja = round(kinerja_f + kinerja_fn, 1)
     elif persentase_kerusakan <= 15.0 and total_kinerja >= 79.5:
         keparahan = "Ringan"
-    elif persentase_kerusakan <= 45.0 and total_kinerja >= 50.0:
+    elif persentase_kerusakan <= 45.0:
         keparahan = "Sedang"
+        # Pastikan rating IKBG selaras dengan status Sedang (tidak bertuliskan Baik / >79.5 saat kerusakan 15-45%)
+        skor_fisik = min(skor_fisik, 78.5)
+        skor_fungsi = min(skor_fungsi, 84.0)
+        kinerja_f = round(0.5 * skor_fisik, 1)
+        kinerja_fn = round(0.5 * skor_fungsi, 1)
+        total_kinerja = round(kinerja_f + kinerja_fn, 1)
     else:
         keparahan = "Berat"
+        # Pastikan rating IKBG & kategori pemeliharaan selaras saat kerusakan > 45%
+        skor_fisik = min(skor_fisik, 48.0)
+        skor_fungsi = min(skor_fungsi, 50.0)
+        kinerja_f = round(0.5 * skor_fisik, 1)
+        kinerja_fn = round(0.5 * skor_fungsi, 1)
+        total_kinerja = round(kinerja_f + kinerja_fn, 1)
 
     if keparahan == "Ringan":
         desc_fisik = (
@@ -4046,7 +4112,8 @@ if menu == "📊 Dashboard Utama & Input Data":
                     koordinat_lokasi=koordinat_clean,
                     objek_inspeksi=objek_inspeksi_pilihan,
                     luas_total=float(result_ai.get("luas_total", luas_total_input)),
-                    persentase_kerusakan=float(result_ai.get("persentase_kerusakan", est_pct))
+                    persentase_kerusakan=float(result_ai.get("persentase_kerusakan", est_pct)),
+                    tingkat_keparahan=str(result_ai.get("tingkat_keparahan", "Sedang"))
                 )
 
                 result_ai["db_id"] = record_id
@@ -4135,12 +4202,13 @@ if menu == "📊 Dashboard Utama & Input Data":
             c_sim1, c_sim2 = st.columns([2, 1])
             with c_sim1:
                 max_slider = max(50.0, float(round(curr_vol * 3.0, 1)))
+                sim_step = 0.05 if curr_vol < 1.0 else 0.5
                 sim_volume = st.slider(
                     f"Penyesuaian Besaran Volume ({satuan_kerja}):",
-                    min_value=0.5,
+                    min_value=0.05,
                     max_value=float(max_slider),
                     value=float(curr_vol),
-                    step=0.5,
+                    step=sim_step,
                     key=f"sim_slider_{res.get('db_id', 0)}"
                 )
 
@@ -4643,7 +4711,8 @@ elif menu == "📜 Riwayat Inspeksi Gedung":
         # Format tampilan tabel untuk Streamlit dengan Metadata Lengkap
         table_display = []
         for r in filtered_records:
-            pct_r = float(r.get("persentase_kerusakan") or 0.0)
+            eval_row = compute_condition_assessment(r)
+            pct_r = float(eval_row["persentase_kerusakan"])
             table_display.append({
                 "ID": r["id"],
                 "Tanggal": str(r["tanggal"])[:16] if r.get("tanggal") else "-",
@@ -4656,7 +4725,7 @@ elif menu == "📜 Riwayat Inspeksi Gedung":
                 "Kode AHSP": r["kode_ahsp"],
                 "Volume": f"{r['volume']:.2f} {r['satuan']}",
                 "Prosentase": f"{pct_r:.2f}%",
-                "Keparahan": r.get("tingkat_keparahan", "Sedang"),
+                "Keparahan": eval_row["keparahan"],
                 "Harga Satuan": format_rupiah(r["harga_satuan"]),
                 "Total Biaya": format_rupiah(r["total_biaya"]),
                 "Rekomendasi Teknis": r["rekomendasi"]
