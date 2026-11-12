@@ -2141,6 +2141,36 @@ class AHSPKnowledgeBase:
         el_clean = elemen.replace("Arsitektur - ", "").replace("Struktur - ", "").strip().lower()
         sub_clean = sub_kerusakan.strip().lower()
 
+        # Penanganan khusus elemen struktur beton agar Spalling/Exposed Rebar dan Retak bekerja pada Balok, Kolom, & Dak
+        if any(k in el_clean for k in ("balok", "kolom", "dak", "pelat")):
+            el_label = (
+                "Balok Beton Bertulang" if "balok" in el_clean else
+                "Kolom Struktur Beton" if "kolom" in el_clean else
+                "Pelat Lantai / Dak Beton"
+            )
+            if any(k in sub_clean for k in ("rebar", "tulangan", "spalling", "keropos")):
+                base = dict(cls.CATALOG["A.4.1.1.20.JT"])
+                base["elemen_terkait"] = el_label
+                if "rebar" in sub_clean or "tulangan" in sub_clean:
+                    base["sub_kerusakan"] = "Tulangan Terbuka (Exposed Rebar)"
+                    base["jenis_kerusakan"] = f"Besi Tulangan Terbuka (Exposed Rebar) pada {el_label}"
+                else:
+                    base["sub_kerusakan"] = "Spalling / Keropos Beton"
+                    base["jenis_kerusakan"] = f"Spalling / Keropos Beton pada {el_label}"
+                return base
+            if any(k in sub_clean for k in ("rembes", "bocor", "efflorescence", "jamur")):
+                base = dict(cls.CATALOG["A.4.4.3.35.JT"])
+                base["elemen_terkait"] = el_label
+                base["jenis_kerusakan"] = f"Rembesan Air & Efloresensi Garam pada {el_label}"
+                return base
+            if any(k in sub_clean for k in ("retak", "crack")):
+                if "dak" in el_clean or "pelat" in el_clean:
+                    return cls.CATALOG["A.4.4.3.35.JT"]
+                base = dict(cls.CATALOG["A.4.1.1.18.JT"])
+                base["elemen_terkait"] = el_label
+                base["jenis_kerusakan"] = f"Retak Struktur (Crack) pada {el_label}"
+                return base
+
         if sub_clean and "otomatis" not in sub_clean:
             for item in cls.CATALOG.values():
                 item_el = item["elemen_terkait"].lower()
@@ -2334,12 +2364,69 @@ class AIAgentClient:
         return None
 
     @classmethod
+    def _infer_visual_subdefect_fallback(cls, image_bytes: bytes, elemen_gedung: str) -> str:
+        """Heuristik fitur visual citra (warna karat/jamur/kontras tepi) jika model YOLO tidak mengeluarkan box."""
+        try:
+            import numpy as np
+            arr = np.array(Image.open(io.BytesIO(image_bytes)).convert("RGB").resize((160, 160)), dtype=np.float32)
+            r, g, b = arr[:, :, 0], arr[:, :, 1], arr[:, :, 2]
+            gray = 0.299 * r + 0.587 * g + 0.114 * b
+            # Edge density (proxy retak/pecah), dark stains (jamur/kotor), rust/brownish (karat/tulangan)
+            gx = np.abs(np.diff(gray, axis=1)).mean()
+            gy = np.abs(np.diff(gray, axis=0)).mean()
+            edge_score = gx + gy
+            dark_ratio = float((gray < 75).mean())
+            rust_ratio = float(((r > g + 18) & (r > b + 28) & (r > 80)).mean())
+            bright_ratio = float((gray > 205).mean())
+        except Exception:
+            return ""
+
+        el = elemen_gedung.lower()
+        if "dinding" in el or "partisi" in el:
+            if dark_ratio > 0.22:
+                return "Jamur"
+            if rust_ratio > 0.15 or bright_ratio > 0.35:
+                return "Pengelupasan cat"
+            return "Retak rambut" if edge_score > 16 else "Cat menggelembung"
+        if "plafon" in el:
+            if dark_ratio > 0.20:
+                return "Jamur"
+            if rust_ratio > 0.12:
+                return "Kebocoran"
+            return "Retak" if edge_score > 18 else "Rusak"
+        if "pintu" in el or "jendela" in el:
+            if rust_ratio > 0.14:
+                return "Karat"
+            if edge_score > 24:
+                return "Kaca retak"
+            return "Pelapukan" if dark_ratio > 0.22 else "Kotor"
+        if "lantai" in el and "dak" not in el:
+            if dark_ratio > 0.22:
+                return "Berjamur"
+            if edge_score > 24:
+                return "Pecah"
+            return "Retak" if edge_score > 16 else "Kotor"
+        if "atap" in el and "dak" not in el:
+            if rust_ratio > 0.14:
+                return "Karat"
+            if dark_ratio > 0.22:
+                return "Jamur"
+            return "Pecah" if edge_score > 20 else "Bocor"
+        if "balok" in el or "kolom" in el:
+            if rust_ratio > 0.10 or dark_ratio > 0.25:
+                return "Tulangan Terbuka (Exposed Rebar)"
+            return "Retak Struktur (Crack)" if edge_score > 15 else "Spalling / Keropos"
+        if "dak" in el or "pelat" in el:
+            return "Rembesan / Bocor & Efflorescence"
+        return ""
+
+    @classmethod
     def _map_yolo_defect_to_ahsp(
         cls, class_name: str, elemen_gedung: str, jenis_kerusakan_pilihan: str = "Deteksi Otomatis AI"
     ) -> Dict[str, Any]:
         """
-        Memetakan hasil deteksi YOLOv8 secara ketat di dalam lingkup Objek Inspeksi terpilih,
-        sehingga elemen arsitektur (Lantai/Plafon/Pintu/Atap/Dinding) tidak tertukar ke elemen struktur.
+        Memetakan hasil deteksi 4 kelas YOLOv8 (Crack, Efflorescence, Exposed Rebar, Spalling)
+        sesuai konteks Objek Inspeksi terpilih agar akurat baik untuk Struktur maupun Arsitektur.
         """
         if jenis_kerusakan_pilihan and "otomatis" not in jenis_kerusakan_pilihan.lower():
             item = AHSPKnowledgeBase.find_by_element_and_defect(elemen_gedung, jenis_kerusakan_pilihan)
@@ -2366,14 +2453,23 @@ class AIAgentClient:
             sub = "Pecah" if ("crack" in c_lower or "spalling" in c_lower) else ("Jamur" if "efflorescence" in c_lower else "Karat")
             item = AHSPKnowledgeBase.find_by_element_and_defect("Atap", sub)
         elif "dinding" in el_lower or "partisi" in el_lower:
-            sub = "Pengelupasan cat" if ("spalling" in c_lower or "efflorescence" in c_lower) else "Retak rambut"
+            sub = "Jamur" if "efflorescence" in c_lower else ("Pengelupasan cat" if ("spalling" in c_lower or "rebar" in c_lower) else "Retak rambut")
             item = AHSPKnowledgeBase.find_by_element_and_defect("Dinding dan Partisi", sub)
-        elif "balok" in el_lower:
-            item = AHSPKnowledgeBase.get_by_code("A.4.1.1.18.JT" if "crack" in c_lower else "A.4.1.1.20.JT")
-        elif "kolom" in el_lower:
-            item = AHSPKnowledgeBase.get_by_code("A.4.1.1.18.JT" if "crack" in c_lower else "A.4.1.1.20.JT")
+        elif "balok" in el_lower or "kolom" in el_lower:
+            el_label = "Balok Beton Bertulang" if "balok" in el_lower else "Kolom Struktur Beton"
+            if "rebar" in c_lower:
+                item = AHSPKnowledgeBase.find_by_element_and_defect(el_label, "Tulangan Terbuka (Exposed Rebar)")
+            elif "spalling" in c_lower:
+                item = AHSPKnowledgeBase.find_by_element_and_defect(el_label, "Spalling / Keropos")
+            elif "efflorescence" in c_lower:
+                item = AHSPKnowledgeBase.find_by_element_and_defect(el_label, "Efflorescence")
+            else:
+                item = AHSPKnowledgeBase.find_by_element_and_defect(el_label, "Retak Struktur (Crack)")
         elif "dak" in el_lower or "pelat" in el_lower:
-            item = AHSPKnowledgeBase.get_by_code("A.4.4.3.35.JT" if ("crack" in c_lower or "efflorescence" in c_lower) else "A.4.1.1.20.JT")
+            if "spalling" in c_lower or "rebar" in c_lower:
+                item = AHSPKnowledgeBase.find_by_element_and_defect("Pelat Lantai / Dak Beton", "Spalling")
+            else:
+                item = AHSPKnowledgeBase.find_by_element_and_defect("Pelat Lantai / Dak Beton", "Rembesan / Bocor & Efflorescence")
         else:
             item = AHSPKnowledgeBase.find_by_element(elemen_gedung)
 
@@ -2396,14 +2492,18 @@ class AIAgentClient:
         is_yolo_active: bool,
         confidence_score: float,
         detected_boxes: Optional[List[Dict[str, Any]]] = None,
-        warning: str = ""
+        warning: str = "",
+        elemen_override: str = "",
+        kerusakan_override: str = ""
     ) -> Dict[str, Any]:
         """Menyusun paket hasil analisis standar dengan skala prosentase dan tingkat keparahan yang logis."""
+        elemen_final = elemen_override or ahsp_item["elemen_terkait"]
+        kerusakan_final = kerusakan_override or ahsp_item["jenis_kerusakan"]
         harga_satuan = ahsp_item["harga_satuan"]
         total_biaya = int(round(volume * harga_satuan))
         temp_item = {
-            "elemen_gedung": ahsp_item["elemen_terkait"],
-            "jenis_kerusakan": ahsp_item["jenis_kerusakan"],
+            "elemen_gedung": elemen_final,
+            "jenis_kerusakan": kerusakan_final,
             "kode_ahsp": ahsp_item["kode"],
             "volume": float(volume),
             "luas_total": float(luas_total),
@@ -2417,8 +2517,8 @@ class AIAgentClient:
             "is_yolo_active": is_yolo_active,
             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "filename": filename,
-            "elemen_gedung": ahsp_item["elemen_terkait"],
-            "jenis_kerusakan": ahsp_item["jenis_kerusakan"],
+            "elemen_gedung": elemen_final,
+            "jenis_kerusakan": kerusakan_final,
             "tingkat_keparahan": eval_res["keparahan"],
             "persentase_kerusakan": eval_res["persentase_kerusakan"],
             "luas_total": eval_res["luas_total"],
@@ -2479,11 +2579,10 @@ class AIAgentClient:
                     cls_id = int(b.cls[0].item())
                     cls_name = model_names.get(cls_id, "Crack")
                     ahsp_map = cls._map_yolo_defect_to_ahsp(cls_name, elemen_gedung, jenis_kerusakan_pilihan)
-                    item_temp = AHSPKnowledgeBase.get_by_code(ahsp_map["kode_ahsp"]) or AHSPKnowledgeBase.find_by_element(elemen_gedung)
                     sev_eval = compute_condition_assessment({
-                        "elemen_gedung": item_temp["elemen_terkait"],
-                        "jenis_kerusakan": item_temp["jenis_kerusakan"],
-                        "kode_ahsp": item_temp["kode"],
+                        "elemen_gedung": ahsp_map["elemen_terkait"],
+                        "jenis_kerusakan": ahsp_map["jenis_kerusakan"],
+                        "kode_ahsp": ahsp_map["kode_ahsp"],
                         "volume": volume,
                         "luas_total": luas_total,
                     })
@@ -2492,13 +2591,17 @@ class AIAgentClient:
                         "box": coords,
                         "class_name": cls_name,
                         "label": ahsp_map["jenis_kerusakan"],
+                        "elemen_terkait": ahsp_map["elemen_terkait"],
                         "confidence": round(conf, 1),
                         "keparahan": sev_eval["keparahan"],
                         "kode_ahsp": ahsp_map["kode_ahsp"]
                     })
 
             if not boxes_data:
-                ahsp_item = AHSPKnowledgeBase.find_by_element_and_defect(elemen_gedung, jenis_kerusakan_pilihan)
+                sub_fallback = jenis_kerusakan_pilihan
+                if not sub_fallback or "otomatis" in sub_fallback.lower():
+                    sub_fallback = cls._infer_visual_subdefect_fallback(image_bytes, elemen_gedung)
+                ahsp_item = AHSPKnowledgeBase.find_by_element_and_defect(elemen_gedung, sub_fallback)
                 return cls._build_analysis_result(
                     ahsp_item=ahsp_item,
                     volume=volume,
@@ -2523,7 +2626,9 @@ class AIAgentClient:
                 agent_id="yolov8-custom-model-engine",
                 is_yolo_active=True,
                 confidence_score=main_box["confidence"],
-                detected_boxes=boxes_data
+                detected_boxes=boxes_data,
+                elemen_override=main_box.get("elemen_terkait", ""),
+                kerusakan_override=main_box.get("label", "")
             )
         except Exception:
             return None
@@ -2621,8 +2726,31 @@ def compute_condition_assessment(item: Dict[str, Any]) -> Dict[str, Any]:
     kinerja_fn = round(0.5 * skor_fungsi, 1)
     total_kinerja = round(kinerja_f + kinerja_fn, 1)
 
-    # Penentuan Tingkat Keparahan berbasis rasio prosentase & klasifikasi PUPR
-    if is_struktural and persentase_kerusakan > 25.0:
+    # Penentuan Tingkat Keparahan:
+    # - Elemen Struktur Primer (Balok/Kolom spalling/exposed rebar/retak) bersifat kritis terhadap keamanan struktur
+    # - Elemen Arsitektur (Lantai, Dinding, Plafon, Pintu/Jendela, Atap) & Waterproofing mengikuti rasio prosentase kerusakan
+    k_lower = str(kerusakan).lower()
+    if is_struktural and kode in ("A.4.1.1.20.JT", "A.4.1.1.18.JT"):
+        if kode == "A.4.1.1.20.JT" or any(w in k_lower for w in ("rebar", "tulangan", "spalling", "keropos")):
+            keparahan = "Berat" if persentase_kerusakan > 1.5 else "Sedang"
+            if keparahan == "Berat":
+                skor_fisik = min(skor_fisik, 48.0)
+                skor_fungsi = min(skor_fungsi, 48.0)
+            else:
+                skor_fisik = min(skor_fisik, 68.0)
+                skor_fungsi = min(skor_fungsi, 70.0)
+        else:
+            keparahan = "Berat" if persentase_kerusakan > 3.0 else "Sedang"
+            if keparahan == "Berat":
+                skor_fisik = min(skor_fisik, 48.0)
+                skor_fungsi = min(skor_fungsi, 50.0)
+            else:
+                skor_fisik = min(skor_fisik, 68.0)
+                skor_fungsi = min(skor_fungsi, 72.0)
+        kinerja_f = round(0.5 * skor_fisik, 1)
+        kinerja_fn = round(0.5 * skor_fungsi, 1)
+        total_kinerja = round(kinerja_f + kinerja_fn, 1)
+    elif is_struktural and persentase_kerusakan > 25.0:
         keparahan = "Berat"
     elif persentase_kerusakan <= 15.0 and total_kinerja >= 79.5:
         keparahan = "Ringan"
@@ -3646,8 +3774,8 @@ if menu == "📊 Dashboard Utama & Input Data":
         jenis_kerusakan_pilihan = st.selectbox(
             f"2. Jenis Kerusakan ({objek_inspeksi_pilihan}):",
             sub_kerusakan_opts,
-            index=1 if len(sub_kerusakan_opts) > 1 else 0,
-            help="Pilih gejala kerusakan spesifik agar pencocokan material AHSP dan skala penilaian 100% akurat."
+            index=0,
+            help="Biarkan 'Deteksi Otomatis AI' agar model YOLOv8 mengklasifikasikan kerusakan dari foto secara otomatis, atau pilih sub-jenis kerusakan spesifik jika ingin menentukan manual."
         )
 
         # Deteksi satuan otomatis berdasarkan item AHSP terkait
@@ -4019,15 +4147,15 @@ if menu == "📊 Dashboard Utama & Input Data":
                     df_upah = pd.DataFrame([
                         {
                             "Unsur Tenaga Kerja": r["Unsur Tenaga Kerja"],
-                            "Koef.": f"{r['Koefisien']:.3f}",
-                            "Kebutuhan": f"{r['Kebutuhan Riil']:.3f} {r['Satuan']}",
+                            "Koef.": r["Koefisien"],
+                            "Kebutuhan": r["Kebutuhan Riil"],
                             "Harga Satuan": format_rupiah(r["Harga Satuan"]),
                             "Jumlah Biaya": format_rupiah(r["Jumlah Biaya"]),
                         }
                         for r in upah_rows
                     ])
                     st.dataframe(df_upah, use_container_width=True, hide_index=True)
-                    st.caption(f"Subtotal Biaya Tenaga Kerja (untuk {vol_calc:.2f} {sat_calc}): **{format_rupiah(round(ahsp_breakdown['subtotal_upah'] * vol_calc))}**")
+                    st.caption(f"Subtotal Biaya Tenaga Kerja (untuk {vol_calc:.2f} {sat_calc}): **{format_rupiah(ahsp_breakdown['subtotal_upah'])}**")
                 else:
                     st.caption("Detail tenaga kerja mengikuti satuan standar pekerjaan.")
 
@@ -4037,21 +4165,21 @@ if menu == "📊 Dashboard Utama & Input Data":
                     df_bahan = pd.DataFrame([
                         {
                             "Nama Bahan / Material": r["Nama Bahan / Material"],
-                            "Koef.": f"{r['Koefisien']:.3f}",
-                            "Kebutuhan": f"{r['Kebutuhan Riil']:.3f} {r['Satuan']}",
+                            "Koef.": r["Koefisien"],
+                            "Kebutuhan": r["Kebutuhan Riil"],
                             "Harga Satuan": format_rupiah(r["Harga Satuan"]),
                             "Jumlah Biaya": format_rupiah(r["Jumlah Biaya"]),
                         }
                         for r in bahan_rows
                     ])
                     st.dataframe(df_bahan, use_container_width=True, hide_index=True)
-                    st.caption(f"Subtotal Biaya Bahan (untuk {vol_calc:.2f} {sat_calc}): **{format_rupiah(round(ahsp_breakdown['subtotal_bahan'] * vol_calc))}**")
+                    st.caption(f"Subtotal Biaya Bahan (untuk {vol_calc:.2f} {sat_calc}): **{format_rupiah(ahsp_breakdown['subtotal_bahan'])}**")
                 else:
                     st.caption("Detail material mengikuti satuan standar pekerjaan.")
 
             st.markdown(f"""
             <div style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:8px; padding:10px 14px; margin-top:8px; font-size:0.85rem; color:#1e293b;">
-                <b>Ringkasan Biaya Satuan ({kode_item}):</b> Tenaga + Bahan = <b>{format_rupiah(ahsp_breakdown['subtotal_langsung'])}</b> | Overhead &amp; Profit (15%) = <b>{format_rupiah(ahsp_breakdown['overhead_15'])}</b> | HSP/{sat_calc} = <b>{format_rupiah(res.get('harga_satuan', 0))}</b> &rarr; <b>Total Estimasi Anggaran: {format_rupiah(res.get('total_biaya', 0))}</b>
+                <b>Ringkasan Biaya ({vol_calc:.2f} {sat_calc} | {kode_item}):</b> Tenaga + Bahan = <b>{format_rupiah(ahsp_breakdown['subtotal_langsung'])}</b> | Overhead &amp; Profit (15%) = <b>{format_rupiah(ahsp_breakdown['overhead_15'])}</b> | HSP/{sat_calc} = <b>{format_rupiah(res.get('harga_satuan', 0))}</b> &rarr; <b>Total Estimasi Anggaran: {format_rupiah(res.get('total_biaya', 0))}</b>
             </div>
             """, unsafe_allow_html=True)
 
