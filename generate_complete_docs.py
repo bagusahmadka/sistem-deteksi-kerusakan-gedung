@@ -475,7 +475,7 @@ def build_complete_document():
         "[DATA PERSISTENCE & OUTPUT ENGINE]\n"
         "  • Penyimpanan Riwayat Transaksi ke Database SQLite3 (pemeliharaan_gedung.db)\n"
         "  • Kompilasi Berita Acara Resmi PDF Platypus ReportLab (Kop PU, Foto, IKBG, RAB, TTD)\n"
-        "  • Pembuatan Lembar Kerja Excel (.xlsx) & Visualisasi Dashboard Portofolio Altair",
+        "  • Penyusunan Dokumen PDF Platypus ReportLab & Rekapitulasi Riwayat Database SQLite",
         title="DIAGRAM ALUR LOGIKA SISTEM DETEKSI KERUSAKAN",
         border_color="1E3A8A",
         bg_color="F8FAFC",
@@ -835,27 +835,28 @@ def build_complete_document():
     )
 
     # Fitur 9: Modul Riwayat Inspeksi & Database SQLite
-    add_heading_2(doc, "4.7 Fitur 9: Modul Riwayat Inspeksi, Visualisasi Statistik Altair & Portofolio Database")
+    add_heading_2(doc, "4.7 Fitur 9: Modul Riwayat Inspeksi & Portofolio Database SQLite")
     add_body_p(
         doc,
-        "Halaman Riwayat Inspeksi berfungsi sebagai pusat kendali eksekutif untuk memonitor seluruh data gedung yang tersimpan "
-        "di dalam basis data SQLite `pemeliharaan_gedung.db`."
+        "Halaman Riwayat Inspeksi berfungsi sebagai pusat kendali untuk memonitor seluruh data gedung yang tersimpan "
+        "di dalam basis data SQLite `pemeliharaan_gedung.db` secara transparan dan terstruktur."
     )
     img_f9_kpi = os.path.join(USER_UP_DIR, "media_1794493547009_35c1ec66.jpg")
-    add_image_with_caption(doc, img_f9_kpi, "Gambar 4.10: Dashboard Riwayat Inspeksi, Kartu Metrik KPI, dan Grafik Visual Interaktif Altair")
+    add_image_with_caption(doc, img_f9_kpi, "Gambar 4.10: Dashboard Riwayat Inspeksi dan Kartu Metrik KPI Eksekutif")
     
     img_f9_tbl = os.path.join(USER_UP_DIR, "media_1794493554728_016027ba.jpg")
     add_image_with_caption(doc, img_f9_tbl, "Gambar 4.11: Tabel Rekapitulasi Riwayat Inspeksi Gedung dengan Fasilitas Filter Dinamis")
     
     img_f9_exp = os.path.join(USER_UP_DIR, "media_1794493560146_9d5fd71d.jpg")
-    add_image_with_caption(doc, img_f9_exp, "Gambar 4.12: Fasilitas Ekspor Terpadu (Excel, PDF, CSV) dan Pengamanan Reset Database Dua Langkah")
+    add_image_with_caption(doc, img_f9_exp, "Gambar 4.12: Fasilitas Ekspor PDF Resmi dan Pengamanan Reset Database Dua Langkah")
 
     add_body_p(
         doc,
         "Fitur Utama pada Modul Riwayat:\n"
         "• 4 Kartu KPI Eksekutif: Total Akumulasi Biaya RAB Seluruh Gedung, Total Titik Inspeksi Tercatat, Rata-rata Biaya per Titik, dan Elemen Gedung Paling Sering Rusak.\n"
-        "• Visualisasi Diagram Altair: Diagram batang interaktif yang memperlihatkan sebaran alokasi dana per elemen gedung dan diagram donat proporsi tingkat keparahan (Ringan, Sedang, Berat).\n"
-        "• Baris Tombol Ekspor Terpadu: Ekspor Excel spreadsheet (.xlsx), Ekspor PDF Gabungan Seluruh Riwayat, dan Ekspor Database CSV.\n"
+        "• Tabel Rekapitulasi Riwayat Transparan: Menampilkan seluruh data inspeksi secara kronologis lengkap dengan ID, Tanggal & Waktu, Nama Gedung, Objek, Volume, Prosentase Kerusakan, dan Total Biaya.\n"
+        "• Filter Cerdas & Pencarian Pintar: Memudahkan pencarian riwayat data berdasarkan elemen gedung maupun kata kunci spesifik.\n"
+        "• Ekspor Formulir Data Kerusakan PDF: Mengunduh berkas laporan resmi gabungan seluruh riwayat inspeksi.\n"
         "• Two-Step Safety Popover: Pengamanan reset database bertingkat di mana pengguna diwajibkan mengetik kata 'HAPUS' sebelum data dapat dikosongkan."
     )
 

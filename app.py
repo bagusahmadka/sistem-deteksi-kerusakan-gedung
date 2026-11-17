@@ -4714,63 +4714,6 @@ elif menu == "📜 Riwayat Inspeksi Gedung":
 
         st.markdown("---")
 
-        # -----------------------------------------------------------------------------------------
-        # PILIHAN A (BAGIAN 2): VISUALISASI STATISTIK DENGAN GRAFIK ALTAIR
-        # -----------------------------------------------------------------------------------------
-        st.markdown("#### 📈 Visualisasi Statistik & Analisis Sebaran Kerusakan")
-        col_ch1, col_ch2 = st.columns(2)
-
-        with col_ch1:
-            df_chart_elem = pd.DataFrame([
-                {"Elemen Gedung": k, "Total Anggaran (Rp)": v}
-                for k, v in elemen_budgets.items()
-            ]).sort_values(by="Total Anggaran (Rp)", ascending=False)
-
-            bar_chart = alt.Chart(df_chart_elem).mark_bar(
-                cornerRadiusTopLeft=6, cornerRadiusTopRight=6, color="#2563eb"
-            ).encode(
-                x=alt.X("Total Anggaran (Rp):Q", title="Total Estimasi RAB (Rp)", axis=alt.Axis(format="~s")),
-                y=alt.Y("Elemen Gedung:N", sort="-x", title="Elemen Gedung"),
-                tooltip=[
-                    alt.Tooltip("Elemen Gedung:N"),
-                    alt.Tooltip("Total Anggaran (Rp):Q", format=",.0f")
-                ]
-            ).properties(
-                title="Distribusi Anggaran Pemeliharaan per Elemen Gedung",
-                height=280
-            )
-            st.altair_chart(bar_chart, use_container_width=True)
-
-        with col_ch2:
-            df_chart_sev = pd.DataFrame([
-                {"Tingkat Keparahan": k, "Jumlah Titik": v}
-                for k, v in severity_counts.items()
-                if v > 0
-            ])
-
-            donut_chart = alt.Chart(df_chart_sev).mark_arc(innerRadius=50).encode(
-                theta=alt.Theta(field="Jumlah Titik", type="quantitative"),
-                color=alt.Color(
-                    field="Tingkat Keparahan",
-                    type="nominal",
-                    scale=alt.Scale(
-                        domain=["Ringan", "Sedang", "Berat"],
-                        range=["#10B981", "#F59E0B", "#EF4444"]
-                    ),
-                    legend=alt.Legend(title="Keparahan", orient="bottom")
-                ),
-                tooltip=[
-                    alt.Tooltip("Tingkat Keparahan:N"),
-                    alt.Tooltip("Jumlah Titik:Q")
-                ]
-            ).properties(
-                title="Proporsi Tingkat Keparahan Kerusakan (Visual AI)",
-                height=280
-            )
-            st.altair_chart(donut_chart, use_container_width=True)
-
-        st.markdown("---")
-
         # Fitur Filter Data
         col_f1, col_f2 = st.columns([1, 2])
         with col_f1:
