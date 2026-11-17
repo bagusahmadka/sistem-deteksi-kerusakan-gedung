@@ -1,5 +1,5 @@
 ---
-title: Sistem Deteksi Kerusakan Gedung
+title: SIPEKA (Sistem Deteksi Kerusakan Gedung)
 emoji: 🏢
 colorFrom: blue
 colorTo: indigo
@@ -9,7 +9,7 @@ app_file: app.py
 pinned: false
 ---
 
-# SISTEM DETEKSI KERUSAKAN GEDUNG
+# SIPEKA (SISTEM DETEKSI KERUSAKAN GEDUNG)
 ### Aplikasi Skripsi Teknik Sipil Digital (Deteksi Kerusakan & Estimasi AHSP Jawa Tengah)
 
 Aplikasi website komprehensif untuk inspeksi kondisi fisik bangunan gedung, identifikasi kerusakan otomatis menggunakan model Deep Learning YOLOv8, serta perhitungan Rencana Anggaran Biaya (RAB) pemeliharaan mengacu pada standar resmi **AHSP Dinas PU Bina Marga & Cipta Karya Provinsi Jawa Tengah Tahun 2023** (berdasarkan Permen PUPR No. 1/PRT/M/2022 & Permen PUPR No. 24/PRT/M/2008).

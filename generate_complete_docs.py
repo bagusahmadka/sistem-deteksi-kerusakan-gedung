@@ -215,7 +215,7 @@ def build_complete_document():
         p_ft = footer.paragraphs[0]
         p_ft.alignment = WD_ALIGN_PARAGRAPH.RIGHT
         p_ft.paragraph_format.space_before = Pt(4)
-        run_ft = p_ft.add_run("Dokumentasi Sistem Deteksi Kerusakan Gedung (YOLOv8 & AHSP Jateng 2023)")
+        run_ft = p_ft.add_run("Dokumentasi SIPEKA (Sistem Deteksi Kerusakan Gedung) - YOLOv8 & AHSP Jateng 2023")
         run_ft.font.name = "Calibri"
         run_ft.font.size = Pt(8.5)
         run_ft.font.italic = True
@@ -239,7 +239,7 @@ def build_complete_document():
     p_title.paragraph_format.space_before = Pt(4)
     p_title.paragraph_format.space_after = Pt(14)
     run_title = p_title.add_run(
-        "SISTEM INFORMASI DETEKSI KERUSAKAN BANGUNAN GEDUNG\n"
+        "SIPEKA (SISTEM DETEKSI KERUSAKAN GEDUNG)\n"
         "BERBASIS COMPUTER VISION DEEP LEARNING (YOLOV8)\n"
         "DAN ESTIMASI ANGGARAN BIAYA (AHSP JAWA TENGAH 2023)"
     )
@@ -309,7 +309,7 @@ def build_complete_document():
     
     add_body_p(
         doc,
-        "Dalam membangun Sistem Deteksi Kerusakan Gedung dari nol hingga ter-deploy secara daring (online) pada layanan "
+        "Dalam membangun SIPEKA (Sistem Deteksi Kerusakan Gedung) dari nol hingga ter-deploy secara daring (online) pada layanan "
         "Streamlit Community Cloud, diperlukan serangkaian komponen perangkat keras (hardware), perangkat lunak (software), "
         "library pemrograman, lingkungan eksekusi (runtime environment), serta alur version control system (VCS). "
         "Berikut adalah inventarisasi lengkap seluruh perangkat dan dependensi yang digunakan."
@@ -576,7 +576,7 @@ def build_complete_document():
         doc,
         "Modul ini menggunakan ReportLab Platypus (Page Layout and Typography Using Scripts) untuk menyusun dokumen A4 resmi. "
         "Urutan tata letak elemen pada dokumen PDF diatur secara terstruktur sesuai format standar dinas:\n"
-        "1. Kop Dokumen Resmi: Judul 'FORMULIR DATA KERUSAKAN BANGUNAN GEDUNG' dan 'SISTEM DETEKSI KERUSAKAN GEDUNG'.\n"
+        "1. Kop Dokumen Resmi: Judul 'FORMULIR DATA KERUSAKAN BANGUNAN GEDUNG' dan 'SIPEKA (SISTEM DETEKSI KERUSAKAN GEDUNG)'.\n"
         "2. Tabel Metadata Inspeksi: Memuat Nomor Dokumen unik, Tanggal & Jam Cetak Real-Time WIB, Objek Bangunan, Lokasi/Lantai, Nama Surveyor, dan Acuan Regulasi.\n"
         "3. Bagian 1: DOKUMENTASI: Menyisipkan foto lapangan beranotasi bounding box AI dengan caption teknis.\n"
         "4. Bagian 2: FORMULIR PROSENTASE PENILAIAN KONDISI FISIK DAN FUNGSIONAL (IKBG): Tabel matriks evaluasi kondisi fisik (50%) dan fungsi (50%) beserta klasifikasi tindakan.\n"

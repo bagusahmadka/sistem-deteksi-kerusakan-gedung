@@ -36,7 +36,7 @@ from reportlab.lib.units import cm
 # 1. KONFIGURASI APLIKASI STREAMLIT & CUSTOM STYLING (TAILWIND-INSPIRED DESIGN)
 # ==================================================================================================
 st.set_page_config(
-    page_title="Sistem Deteksi Kerusakan Gedung",
+    page_title="SIPEKA (Sistem Deteksi Kerusakan Gedung)",
     page_icon="🏢",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -3300,7 +3300,7 @@ class PDFReportGenerator:
             topMargin=32,
             bottomMargin=32,
             title=pdf_title,
-            author="Sistem Deteksi Kerusakan Gedung",
+            author="SIPEKA (Sistem Deteksi Kerusakan Gedung)",
             subject="Formulir Data Kerusakan Bangunan Gedung"
         )
 
@@ -3364,9 +3364,9 @@ class PDFReportGenerator:
 
         story = []
 
-        # 1. KOP SURAT RESMI (Sesuai Revisi: FORMULIR DATA KERUSAKAN BANGUNAN GEDUNG & SISTEM DETEKSI KERUSAKAN GEDUNG)
+        # 1. KOP SURAT RESMI (Sesuai Revisi: FORMULIR DATA KERUSAKAN BANGUNAN GEDUNG & SIPEKA (SISTEM DETEKSI KERUSAKAN GEDUNG))
         story.append(Paragraph("FORMULIR DATA KERUSAKAN BANGUNAN GEDUNG", kop_title_style))
-        story.append(Paragraph("SISTEM DETEKSI KERUSAKAN GEDUNG", kop_sub_style))
+        story.append(Paragraph("SIPEKA (SISTEM DETEKSI KERUSAKAN GEDUNG)", kop_sub_style))
         story.append(Spacer(1, 4))
         story.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor('#0F172A'), spaceBefore=2, spaceAfter=6))
 
@@ -3841,7 +3841,7 @@ st.sidebar.markdown("""
     <div style="display: inline-block; padding: 14px; background: linear-gradient(135deg, #1e293b, #0f172a); border-radius: 20px; box-shadow: 0 8px 18px rgba(15, 23, 42, 0.25); border: 1px solid rgba(255,255,255,0.1); margin-bottom: 8px;">
         <span style="font-size: 2.2rem;">🏢</span>
     </div>
-    <h3 style="margin: 6px 0 0 0; color: #0f172a; font-weight: 900; letter-spacing: -0.5px; font-size: 1.15rem; line-height: 1.3;">Sistem Deteksi Kerusakan Gedung</h3>
+    <h3 style="margin: 6px 0 0 0; color: #0f172a; font-weight: 900; letter-spacing: -0.5px; font-size: 1.15rem; line-height: 1.3;">SIPEKA (Sistem Deteksi Kerusakan Gedung)</h3>
     <div class="live-badge" style="margin-top: 6px; padding: 2px 10px; font-size: 0.72rem;">
         <span class="live-dot"></span> SISTEM ONLINE
     </div>
@@ -3941,7 +3941,7 @@ if menu == "📊 Dashboard Utama & Input Data":
                         <span class="live-dot"></span> YOLOV8 ENGINE SIAP
                     </div>
                 </div>
-                <div class="hero-title" style="margin-bottom:0 !important;">Sistem Deteksi Kerusakan Gedung</div>
+                <div class="hero-title" style="margin-bottom:0 !important;">SIPEKA (Sistem Deteksi Kerusakan Gedung)</div>
             </div>
         </div>
     </div>
@@ -4897,7 +4897,7 @@ elif menu == "📜 Riwayat Inspeksi Gedung":
 # ==================================================================================================
 st.markdown("""
 <div style="text-align: center; margin-top: 50px; padding: 24px 0; border-top: 1.5px solid #cbd5e1; font-size: 0.86rem; color: #1e293b; font-weight: 500;">
-    <b style="color: #0f172a; font-weight: 800;">Sistem Deteksi Kerusakan Gedung</b><br>
+    <b style="color: #0f172a; font-weight: 800;">SIPEKA (Sistem Deteksi Kerusakan Gedung)</b><br>
     Manajemen Pemeliharaan &amp; Perawatan Bangunan Gedung | Standar Acuan: <span style="color: #0f172a; font-weight: 700;">AHSP Dinas PU Bina Marga &amp; Cipta Karya Jawa Tengah 2023</span>
 </div>
 """, unsafe_allow_html=True)
