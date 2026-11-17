@@ -2887,10 +2887,10 @@ class AIAgentClient:
                 and b["confidence"] >= 25.0
             ]
             if critical_boxes:
-                # Selaraskan status kotak pendukung pada elemen beton yang mengalami Exposed Rebar/Spalling
+                # Selaraskan status kotak pendukung hanya pada elemen beton struktural yang mengalami Exposed Rebar
                 for b in boxes_data:
-                    if b["keparahan"] == "Ringan":
-                        b["keparahan"] = "Berat" if "rebar" in str(b.get("class_name", "")).lower() or b["confidence"] >= 60.0 else "Sedang"
+                    if b["keparahan"] == "Ringan" and ("kolom" in str(b.get("elemen_terkait", "")).lower() or "balok" in str(b.get("elemen_terkait", "")).lower()):
+                        b["keparahan"] = "Berat" if "rebar" in str(b.get("class_name", "")).lower() else "Sedang"
                 main_box = max(critical_boxes, key=lambda x: x["confidence"])
             else:
                 main_box = max(boxes_data, key=lambda x: x["confidence"])
@@ -3050,6 +3050,14 @@ def compute_condition_assessment(item: Dict[str, Any]) -> Dict[str, Any]:
         keparahan = "Berat"
         skor_fisik = min(skor_fisik, 48.0)
         skor_fungsi = min(skor_fungsi, 50.0)
+        kinerja_f = round(0.5 * skor_fisik, 1)
+        kinerja_fn = round(0.5 * skor_fungsi, 1)
+        total_kinerja = round(kinerja_f + kinerja_fn, 1)
+    elif not is_struktural and persentase_kerusakan <= 15.0:
+        # Elemen Arsitektur (Lantai, Dinding, Plafon) dengan kerusakan <= 15% mutlak berstatus Ringan (Permen PUPR 24/2008)
+        keparahan = "Ringan"
+        skor_fisik = max(skor_fisik, 80.0)
+        skor_fungsi = max(skor_fungsi, 85.0)
         kinerja_f = round(0.5 * skor_fisik, 1)
         kinerja_fn = round(0.5 * skor_fungsi, 1)
         total_kinerja = round(kinerja_f + kinerja_fn, 1)
@@ -3278,18 +3286,22 @@ class PDFReportGenerator:
     def generate_pdf_report(
         cls,
         data_list: List[Dict[str, Any]],
-        title_doc: str = "Laporan Inspeksi Gedung",
+        title_doc: str = "Formulir Data Kerusakan",
         annotated_image_bytes: Optional[bytes] = None,
         signer_info: Optional[Dict[str, str]] = None
     ) -> bytes:
         buffer = io.BytesIO()
+        pdf_title = title_doc.strip() if title_doc and title_doc.strip() else "Formulir Data Kerusakan"
         doc = SimpleDocTemplate(
             buffer,
             pagesize=A4,
             leftMargin=36,
             rightMargin=36,
             topMargin=32,
-            bottomMargin=32
+            bottomMargin=32,
+            title=pdf_title,
+            author="Sistem Deteksi Kerusakan Gedung",
+            subject="Formulir Data Kerusakan Bangunan Gedung"
         )
 
         styles = getSampleStyleSheet()
@@ -3306,9 +3318,9 @@ class PDFReportGenerator:
         kop_sub_style = ParagraphStyle(
             'KopSubtitle',
             parent=styles['Normal'],
-            fontName='Helvetica',
-            fontSize=8.5,
-            leading=11.5,
+            fontName='Helvetica-Bold',
+            fontSize=9,
+            leading=12,
             alignment=1,
             textColor=colors.HexColor('#475569')
         )
@@ -3352,11 +3364,9 @@ class PDFReportGenerator:
 
         story = []
 
-        # 1. KOP SURAT RESMI
-        story.append(Paragraph("PEMERINTAH PROVINSI JAWA TENGAH", kop_title_style))
-        story.append(Paragraph("DINAS PEKERJAAN UMUM BINA MARGA DAN CIPTA KARYA", kop_title_style))
+        # 1. KOP SURAT RESMI (Sesuai Revisi: FORMULIR DATA KERUSAKAN BANGUNAN GEDUNG & SISTEM DETEKSI KERUSAKAN GEDUNG)
+        story.append(Paragraph("FORMULIR DATA KERUSAKAN BANGUNAN GEDUNG", kop_title_style))
         story.append(Paragraph("SISTEM DETEKSI KERUSAKAN GEDUNG", kop_sub_style))
-        story.append(Paragraph("Standar Acuan: Pedoman AHSP Gedung & Perumahan Provinsi Jawa Tengah Tahun 2023", kop_sub_style))
         story.append(Spacer(1, 4))
         story.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor('#0F172A'), spaceBefore=2, spaceAfter=6))
 
@@ -3366,20 +3376,23 @@ class PDFReportGenerator:
         target_item = data_list[0] if data_list else {}
         nama_gedung = target_item.get("nama_gedung") or "Bangunan Gedung"
         lokasi_lantai = target_item.get("lokasi_lantai") or "-"
-        surveyor_name = target_item.get("surveyor") or ""
         koordinat_lokasi = target_item.get("koordinat_lokasi") or "-"
         objek_inspeksi = target_item.get("objek_inspeksi") or target_item.get("elemen_gedung") or "-"
-        tanggal_inspeksi = str(target_item.get("tanggal") or datetime.now().strftime("%d %B %Y"))[:22]
 
-        if surveyor_name and surveyor_name not in ["Surveyor Lapangan", "Inspektor Lapangan", "-", ""]:
-            surveyor_disp = surveyor_name
+        raw_tgl = str(target_item.get("tanggal") or "").strip()
+        if raw_tgl and "WIB" in raw_tgl:
+            tanggal_inspeksi = raw_tgl
+        elif raw_tgl:
+            tanggal_inspeksi = f"{raw_tgl} - {datetime.now().strftime('%H:%M')} WIB"
         else:
-            surveyor_disp = "Inspektor Lapangan"
+            now_dt = datetime.now()
+            bulan_id = ["", "Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"]
+            tanggal_inspeksi = f"{now_dt.day:02d} {bulan_id[now_dt.month]} {now_dt.year} - {now_dt.strftime('%H:%M')} WIB"
 
         meta_data = [
             [
                 Paragraph("<b>Nomor Dokumen:</b>", body_small_left), Paragraph(doc_no, body_small_left),
-                Paragraph("<b>Tanggal Inspeksi:</b>", body_small_left), Paragraph(tanggal_inspeksi, body_small_left)
+                Paragraph("<b>Tanggal & Waktu:</b>", body_small_left), Paragraph(tanggal_inspeksi, body_small_left)
             ],
             [
                 Paragraph("<b>Nama Bangunan:</b>", body_small_left), Paragraph(nama_gedung, body_small_left),
@@ -3387,11 +3400,11 @@ class PDFReportGenerator:
             ],
             [
                 Paragraph("<b>Objek Inspeksi:</b>", body_small_left), Paragraph(objek_inspeksi, body_small_left),
-                Paragraph("<b>Nama Inspektor:</b>", body_small_left), Paragraph(surveyor_disp, body_small_left)
+                Paragraph("<b>Koordinat Lokasi:</b>", body_small_left), Paragraph(koordinat_lokasi, body_small_left)
             ],
             [
-                Paragraph("<b>Koordinat Lokasi:</b>", body_small_left), Paragraph(koordinat_lokasi, body_small_left),
-                Paragraph("<b>Acuan Standar:</b>", body_small_left), Paragraph("AHSP Jateng 2023 & Permen PUPR 24/2008", body_small_left)
+                Paragraph("<b>Acuan Regulasi:</b>", body_small_left), Paragraph("AHSP Dinas PU Jateng 2023 & Permen PUPR 24/2008", body_small_left),
+                "", ""
             ]
         ]
         meta_table = Table(meta_data, colWidths=[90, 170, 90, 170])
@@ -3399,6 +3412,7 @@ class PDFReportGenerator:
             ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#F8FAFC')),
             ('BOX', (0, 0), (-1, -1), 0.5, colors.HexColor('#CBD5E1')),
             ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#E2E8F0')),
+            ('SPAN', (1, 3), (3, 3)),
             ('TOPPADDING', (0, 0), (-1, -1), 3),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
         ]))
@@ -3411,12 +3425,11 @@ class PDFReportGenerator:
         eval_m = compute_condition_assessment(target_item)
 
         # -----------------------------------------------------------------------------------------
-        # 3. FOTO DOKUMENTASI KERUSAKAN (URUTAN PERTAMA SESUAI REVISI: FOTO DULU)
+        # 3. FOTO DOKUMENTASI KERUSAKAN (URUTAN 1: FOTO DULU)
         # -----------------------------------------------------------------------------------------
-        sec_offset = 0
+        sec_offset = 1
+        story.append(Paragraph("1. DOKUMENTASI", doc_header_style))
         if annotated_image_bytes:
-            sec_offset = 1
-            story.append(Paragraph("1. DOKUMENTASI FOTO KERUSAKAN BANGUNAN", doc_header_style))
             try:
                 img_io = io.BytesIO(annotated_image_bytes)
                 pil_temp = Image.open(img_io)
@@ -3464,13 +3477,35 @@ class PDFReportGenerator:
                 ]))
                 story.append(Spacer(1, 8))
             except Exception:
-                sec_offset = 0
+                pass
+        else:
+            meta_lampiran = [
+                [
+                    Paragraph(f"<b>Elemen Bangunan:</b> {target_item.get('elemen_gedung', '-')}", body_small_left),
+                    Paragraph(f"<b>Jenis Kerusakan:</b> {target_item.get('jenis_kerusakan', '-')}", body_small_left)
+                ],
+                [
+                    Paragraph(f"<b>Kode AHSP:</b> {target_item.get('kode_ahsp', '-')}", body_small_left),
+                    Paragraph(f"<b>Prosentase & Keparahan:</b> {eval_m['persentase_kerusakan']:.1f}% ({str(eval_m['keparahan']).upper()})", body_small_left)
+                ]
+            ]
+            tbl_lampiran = Table(meta_lampiran, colWidths=[260, 260])
+            tbl_lampiran.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#F8FAFC')),
+                ('BOX', (0, 0), (-1, -1), 0.5, colors.HexColor('#CBD5E1')),
+                ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#E2E8F0')),
+                ('TOPPADDING', (0, 0), (-1, -1), 3),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+            ]))
+            story.append(Paragraph("<i>(Dokumentasi foto visual disimpan dalam sistem basis data inspeksi)</i>", body_small_left))
+            story.append(Spacer(1, 3))
+            story.append(tbl_lampiran)
+            story.append(Spacer(1, 8))
 
         # -----------------------------------------------------------------------------------------
-        # 4. FORMULIR PROSENTASE PENILAIAN KONDISI FISIK DAN FUNGSI (IKBG)
+        # 4. FORMULIR PROSENTASE PENILAIAN KONDISI FISIK DAN FUNGSI (IKBG) (URUTAN 2)
         # -----------------------------------------------------------------------------------------
-        no_ikbg = 1 + sec_offset
-        story.append(Paragraph(f"{no_ikbg}. FORMULIR PROSENTASE PENILAIAN KONDISI FISIK DAN FUNGSI (IKBG)", doc_header_style))
+        story.append(Paragraph("2. FORMULIR PROSENTASE PENILAIAN KONDISI FISIK DAN FUNGSI (IKBG)", doc_header_style))
 
         col_w_assessment = [45, 230, 48, 50, 50, 50, 50]
         data_assessment_table = [
@@ -3614,10 +3649,9 @@ class PDFReportGenerator:
         story.append(Spacer(1, 10))
 
         # -----------------------------------------------------------------------------------------
-        # 5. TABEL REKAPITULASI RENCANA ANGGARAN BIAYA (RAB) & TOTAL ESTIMASI ANGGARAN
+        # 5. TABEL RENCANA ANGGARAN BIAYA (RAB) & TOTAL ESTIMASI ANGGARAN (URUTAN 3)
         # -----------------------------------------------------------------------------------------
-        no_rab = 2 + sec_offset
-        story.append(Paragraph(f"{no_rab}. REKAPITULASI RENCANA ANGGARAN BIAYA (RAB) & TOTAL ESTIMASI ANGGARAN", doc_header_style))
+        story.append(Paragraph("3. RENCANA ANGGARAN BIAYA (RAB) PEMELIHARAAN BANGUNAN GEDUNG", doc_header_style))
 
         headers_rab = [
             Paragraph("<b>No</b>", body_small_bold),
@@ -3731,10 +3765,9 @@ class PDFReportGenerator:
             story.append(Spacer(1, 8))
 
         # -----------------------------------------------------------------------------------------
-        # 6. LANGKAH-LANGKAH PERBAIKAN & REKOMENDASI TEKNIS
+        # 6. LANGKAH-LANGKAH PERBAIKAN & REKOMENDASI TEKNIS (URUTAN 4)
         # -----------------------------------------------------------------------------------------
-        no_rek = 3 + sec_offset
-        story.append(Paragraph(f"{no_rek}. LANGKAH-LANGKAH PERBAIKAN & REKOMENDASI TEKNIS", doc_header_style))
+        story.append(Paragraph("4. LANGKAH-LANGKAH PERBAIKAN & REKOMENDASI TEKNIS", doc_header_style))
         if len(data_list) == 1 and target_item.get("langkah_kerja"):
             for s_idx, step_txt in enumerate(target_item.get("langkah_kerja", []), start=1):
                 story.append(Paragraph(f"<b>Tahap {s_idx}:</b> {step_txt}", body_small_left))
@@ -3747,33 +3780,15 @@ class PDFReportGenerator:
 
         story.append(Spacer(1, 14))
 
-        if not signer_info:
-            signer_info = {}
-
-        # Hanya 2 Penandatangan sesuai Revisi: Dibuat Oleh & Disetujui Oleh
-        s_nama = signer_info.get("surveyor_name") or surveyor_name or ""
-        s_nip = signer_info.get("surveyor_nip") or ""
-        if s_nama and s_nama not in ["Surveyor Lapangan", "Inspektor Lapangan", "-", ""]:
-            sig_s_nama = f"<b><u>{s_nama}</u></b>"
-            sig_s_nip = f"NIP/ID. {s_nip}" if s_nip else "NIP/ID. ....................."
-        else:
-            sig_s_nama = "<u>( .................................................. )</u>"
-            sig_s_nip = "NIP/ID."
-
-        p_nama = signer_info.get("ppk_name") or ""
-        p_nip = signer_info.get("ppk_nip") or ""
-        if p_nama:
-            sig_p_nama = f"<b><u>{p_nama}</u></b>"
-            sig_p_nip = f"NIP. {p_nip}" if p_nip else "NIP. ....................."
-        else:
-            sig_p_nama = "<u>( .................................................. )</u>"
-            sig_p_nip = "NIP."
+        # Penandatangan PDF: Dibuat Oleh & Disetujui Oleh (Nama dikosongi & Tanpa NIP sesuai revisi)
+        sig_s_box = "Dibuat Oleh,<br/><b>Surveyor / Penguji Lapangan</b><br/><br/><br/><br/>( .................................................. )"
+        sig_p_box = "Disetujui Oleh,<br/><b>Pengelola Gedung / PPK</b><br/><br/><br/><br/>( .................................................. )"
 
         story.append(KeepTogether([
             Table([
                 [
-                    Paragraph(f"Dibuat Oleh,<br/><b>Inspektor Lapangan</b><br/><br/><br/><br/>{sig_s_nama}<br/>{sig_s_nip}", body_small),
-                    Paragraph(f"Disetujui Oleh,<br/><b>Pengelola Gedung / PPK</b><br/><br/><br/><br/>{sig_p_nama}<br/>{sig_p_nip}", body_small)
+                    Paragraph(sig_s_box, body_small),
+                    Paragraph(sig_p_box, body_small)
                 ]
             ], colWidths=[260, 260], style=[
                 ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
@@ -3926,10 +3941,7 @@ if menu == "📊 Dashboard Utama & Input Data":
                         <span class="live-dot"></span> YOLOV8 ENGINE SIAP
                     </div>
                 </div>
-                <div class="hero-title">Sistem Deteksi Kerusakan Gedung</div>
-                <div class="hero-subtitle">
-                    Aplikasi inspeksi & pemeliharaan bangunan gedung berbasis Deep Learning YOLOv8 dengan rincian Rencana Anggaran Biaya (RAB), detail kebutuhan bahan AHSP Jawa Tengah 2023, serta formulir penilaian prosentase kondisi (IKBG).
-                </div>
+                <div class="hero-title" style="margin-bottom:0 !important;">Sistem Deteksi Kerusakan Gedung</div>
             </div>
         </div>
     </div>
@@ -3938,16 +3950,7 @@ if menu == "📊 Dashboard Utama & Input Data":
     col_left, col_right = st.columns([1, 1], gap="large")
 
     with col_left:
-        st.markdown("""
-        <div class="tw-card">
-            <div class="tw-card-header">
-                <h4 style="margin: 0; color: #0f172a; font-weight: 800;">📸 Formulir Input Inspeksi Kerusakan</h4>
-                <p style="margin: 4px 0 0 0; font-size: 0.88rem; color: #1e293b; font-weight: 600;">Unggah dokumentasi foto visual lapangan dan input estimasi volume fisik.</p>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-
-        with st.expander("🏢 Lembar Identitas Bangunan & Inspektor", expanded=True):
+        with st.expander("🏢 Lembar Identitas Bangunan & Waktu Inspeksi", expanded=True):
             col_id1, col_id2 = st.columns(2)
             with col_id1:
                 nama_gedung_input = st.text_input(
@@ -3964,44 +3967,40 @@ if menu == "📊 Dashboard Utama & Input Data":
                     help="Masukkan nama ruangan atau zona lokasi inspeksi."
                 )
 
-            objek_options = ["Otomatis (Deteksi AI YOLOv8)"] + list(AHSPKnowledgeBase.OBJEK_INSPEKSI_MAP.keys())
-            default_obj_idx = objek_options.index(st.session_state.get("inp_objek", objek_options[0])) if st.session_state.get("inp_objek") in objek_options else 0
-            objek_inspeksi_pilihan = st.selectbox(
-                "Objek Inspeksi (Dapat Dipilih):",
-                objek_options,
-                index=default_obj_idx,
-                help="Biarkan 'Otomatis (Deteksi AI YOLOv8)' agar model YOLOv8 mendeteksi jenis kerusakan secara langsung seperti semula, atau pilih elemen spesifik Arsitektur/Struktur."
-            )
-
             col_id3, col_id4 = st.columns(2)
             with col_id3:
-                surveyor_input = st.text_input(
-                    "Nama Inspektor (Dibuat Oleh):",
-                    value=st.session_state.get("inp_surveyor", ""),
-                    placeholder="Contoh: Ahmad Fajar, S.T.",
-                    help="Nama inspektor lapangan yang menyusun laporan."
+                objek_options = ["Otomatis (Deteksi AI YOLOv8)"] + list(AHSPKnowledgeBase.OBJEK_INSPEKSI_MAP.keys())
+                default_obj_idx = objek_options.index(st.session_state.get("inp_objek", objek_options[0])) if st.session_state.get("inp_objek") in objek_options else 0
+                objek_inspeksi_pilihan = st.selectbox(
+                    "Objek Inspeksi (Dapat Dipilih):",
+                    objek_options,
+                    index=default_obj_idx,
+                    help="Biarkan 'Otomatis (Deteksi AI YOLOv8)' agar model YOLOv8 mendeteksi jenis kerusakan secara langsung seperti semula, atau pilih elemen spesifik Arsitektur/Struktur."
                 )
             with col_id4:
                 tanggal_inspeksi_obj = st.date_input(
-                    "Tanggal, Bulan, Tahun:",
+                    "Tanggal Inspeksi:",
                     value=st.session_state.get("inp_tanggal_obj", date.today()),
                     format="DD/MM/YYYY",
                     help="Pilih tanggal pelaksanaan inspeksi lapangan."
                 )
 
-            auto_coord_default = st.session_state.get("inp_koordinat") or get_auto_coordinates()
-            col_k1, col_k2 = st.columns([2, 1])
-            with col_k1:
+            col_id5, col_id6 = st.columns(2)
+            with col_id5:
+                now_curr = datetime.now()
+                jam_val = st.session_state.get("inp_jam_obj", now_curr.time())
+                jam_inspeksi_obj = st.time_input(
+                    "Jam / Waktu Inspeksi (WIB):",
+                    value=jam_val,
+                    help="Jam inspeksi real-time sesuai perangkat (WIB). Otomatis akurat dan dapat disesuaikan."
+                )
+                st.caption(f"🕒 Waktu perangkat saat ini: **{now_curr.strftime('%H:%M:%S')} WIB**")
+            with col_id6:
+                auto_coord_default = st.session_state.get("inp_koordinat") or get_auto_coordinates()
                 koordinat_input = st.text_input(
                     "Koordinat Lokasi (Otomatis):",
                     value=auto_coord_default,
                     help="Terdeteksi otomatis (Latitude, Longitude). Dapat disesuaikan jika berada di titik berbeda."
-                )
-            with col_k2:
-                surveyor_nip_input = st.text_input(
-                    "NIP / ID Inspektor:",
-                    value=st.session_state.get("inp_surveyor_nip", ""),
-                    placeholder="Opsional"
                 )
 
             st.components.v1.html("""
@@ -4029,41 +4028,35 @@ if menu == "📊 Dashboard Utama & Input Data":
                 </script>
             """, height=36)
 
-            col_sig_p1, col_sig_p2 = st.columns(2)
-            with col_sig_p1:
-                ppk_input = st.text_input(
-                    "Disetujui Oleh (Pengelola Gedung / PPK):",
-                    value=st.session_state.get("inp_ppk", ""),
-                    placeholder="Contoh: Hendra Kusuma, S.T. (Opsional)"
-                )
-            with col_sig_p2:
-                ppk_nip_input = st.text_input(
-                    "NIP Pejabat Penyetuju:",
-                    value=st.session_state.get("inp_ppk_nip", ""),
-                    placeholder="Opsional"
-                )
+            surveyor_input = ""
+            surveyor_nip_input = ""
+            ppk_input = ""
+            ppk_nip_input = ""
 
             bulan_id = [
                 "", "Januari", "Februari", "Maret", "April", "Mei", "Juni",
                 "Juli", "Agustus", "September", "Oktober", "November", "Desember"
             ]
-            tanggal_formatted = f"{tanggal_inspeksi_obj.day:02d} {bulan_id[tanggal_inspeksi_obj.month]} {tanggal_inspeksi_obj.year}"
+            jam_str = jam_inspeksi_obj.strftime("%H:%M")
+            tanggal_formatted = f"{tanggal_inspeksi_obj.day:02d} {bulan_id[tanggal_inspeksi_obj.month]} {tanggal_inspeksi_obj.year} - {jam_str} WIB"
 
             st.session_state["inp_gedung"] = nama_gedung_input
             st.session_state["inp_lokasi"] = lokasi_lantai_input
             st.session_state["inp_objek"] = objek_inspeksi_pilihan
-            st.session_state["inp_surveyor"] = surveyor_input
-            st.session_state["inp_surveyor_nip"] = surveyor_nip_input
+            st.session_state["inp_surveyor"] = ""
+            st.session_state["inp_surveyor_nip"] = ""
             st.session_state["inp_tanggal_obj"] = tanggal_inspeksi_obj
+            st.session_state["inp_jam_obj"] = jam_inspeksi_obj
+            st.session_state["inp_tanggal_formatted"] = tanggal_formatted
             st.session_state["inp_koordinat"] = koordinat_input
-            st.session_state["inp_ppk"] = ppk_input
-            st.session_state["inp_ppk_nip"] = ppk_nip_input
+            st.session_state["inp_ppk"] = ""
+            st.session_state["inp_ppk_nip"] = ""
 
             st.session_state["signer_info"] = {
-                "surveyor_name": surveyor_input.strip() if surveyor_input else "",
-                "surveyor_nip": surveyor_nip_input.strip() if surveyor_nip_input else "",
-                "ppk_name": ppk_input.strip() if ppk_input else "",
-                "ppk_nip": ppk_nip_input.strip() if ppk_nip_input else "",
+                "surveyor_name": "",
+                "surveyor_nip": "",
+                "ppk_name": "",
+                "ppk_nip": "",
             }
 
         # Area Unggah Foto Diperbesar dengan Visual Kamera
@@ -4158,15 +4151,6 @@ if menu == "📊 Dashboard Utama & Input Data":
         start_btn = st.button("🚀 Mulai Analisis Sistem", type="primary", use_container_width=True)
 
     with col_right:
-        st.markdown("""
-        <div class="tw-card">
-            <div class="tw-card-header">
-                <h4 style="margin: 0; color: #0f172a; font-weight: 800;">🔍 Sensor Visual & Pratinjau Citra</h4>
-                <p style="margin: 4px 0 0 0; font-size: 0.88rem; color: #1e293b; font-weight: 600;">Citra yang diunggah akan dianalisis oleh sistem Computer Vision YOLOv8.</p>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-
         if st.session_state.get("annotated_img_bytes") is not None and st.session_state.latest_analysis is not None:
             tab_ai, tab_raw = st.tabs(["🎯 Citra Anotasi Deteksi AI (Bounding Box)", "📷 Foto Lapangan Asli"])
             with tab_ai:
@@ -4230,7 +4214,7 @@ if menu == "📊 Dashboard Utama & Input Data":
 
                 nama_gedung_clean = nama_gedung_input.strip() if nama_gedung_input and nama_gedung_input.strip() else "Bangunan Gedung"
                 lokasi_clean = lokasi_lantai_input.strip() if lokasi_lantai_input and lokasi_lantai_input.strip() else "-"
-                surveyor_clean = surveyor_input.strip() if surveyor_input and surveyor_input.strip() else "Inspektor Lapangan"
+                surveyor_clean = surveyor_input.strip() if surveyor_input and surveyor_input.strip() else "-"
                 koordinat_clean = koordinat_input.strip() if koordinat_input and koordinat_input.strip() else get_auto_coordinates()
 
                 result_ai["nama_gedung"] = nama_gedung_clean
@@ -4435,14 +4419,10 @@ if menu == "📊 Dashboard Utama & Input Data":
         st.table(df_rab)
 
         # -----------------------------------------------------------------------------------------
-        # TOTAL ESTIMASI ANGGARAN & RINCIAN AHSP DETAIL PER MASING-MASING BAHAN & TENAGA KERJA
+        # TOTAL ESTIMASI ANGGARAN PERBAIKAN (RAB)
         # -----------------------------------------------------------------------------------------
-        kode_item = res.get("kode_ahsp", "")
         vol_calc = float(res.get("volume", 0.0))
         sat_calc = res.get("satuan", "m2")
-        ahsp_breakdown = AHSPKnowledgeBase.compute_material_breakdown(kode_item, vol_calc)
-        upah_rows = ahsp_breakdown.get("upah_rows", [])
-        bahan_rows = ahsp_breakdown.get("bahan_rows", [])
 
         st.markdown(f"""
         <div style="background: linear-gradient(135deg, #ecfdf5 0%, #f0fdf4 100%); border: 2px solid #86efac; border-radius: 14px; padding: 18px 22px; margin: 14px 0 18px 0; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
@@ -4457,50 +4437,6 @@ if menu == "📊 Dashboard Utama & Input Data":
             </div>
         </div>
         """, unsafe_allow_html=True)
-
-        with st.expander("🧱 Rincian AHSP Detail per Masing-Masing Bahan & Tenaga Kerja (AHSP Jateng 2023)", expanded=True):
-            col_koef1, col_koef2 = st.columns(2)
-            with col_koef1:
-                st.markdown("<div style='background:#eff6ff; border-left:4px solid #2563eb; padding:6px 12px; border-radius:4px; margin-bottom:8px;'><b style='color:#1e40af; font-size:0.88rem;'>👷 Rincian Tenaga Kerja Lapangan:</b></div>", unsafe_allow_html=True)
-                if upah_rows:
-                    df_upah = pd.DataFrame([
-                        {
-                            "Unsur Tenaga Kerja": r["Unsur Tenaga Kerja"],
-                            "Koef.": r["Koefisien"],
-                            "Kebutuhan": r["Kebutuhan Riil"],
-                            "Harga Satuan": format_rupiah(r["Harga Satuan"]),
-                            "Jumlah Biaya": format_rupiah(r["Jumlah Biaya"]),
-                        }
-                        for r in upah_rows
-                    ])
-                    st.dataframe(df_upah, use_container_width=True, hide_index=True)
-                    st.caption(f"Subtotal Biaya Tenaga Kerja (untuk {vol_calc:.2f} {sat_calc}): **{format_rupiah(ahsp_breakdown['subtotal_upah'])}**")
-                else:
-                    st.caption("Detail tenaga kerja mengikuti satuan standar pekerjaan.")
-
-            with col_koef2:
-                st.markdown("<div style='background:#f0fdf4; border-left:4px solid #16a34a; padding:6px 12px; border-radius:4px; margin-bottom:8px;'><b style='color:#166534; font-size:0.88rem;'>🧱 Rincian Masing-Masing Bahan & Material:</b></div>", unsafe_allow_html=True)
-                if bahan_rows:
-                    df_bahan = pd.DataFrame([
-                        {
-                            "Nama Bahan / Material": r["Nama Bahan / Material"],
-                            "Koef.": r["Koefisien"],
-                            "Kebutuhan": r["Kebutuhan Riil"],
-                            "Harga Satuan": format_rupiah(r["Harga Satuan"]),
-                            "Jumlah Biaya": format_rupiah(r["Jumlah Biaya"]),
-                        }
-                        for r in bahan_rows
-                    ])
-                    st.dataframe(df_bahan, use_container_width=True, hide_index=True)
-                    st.caption(f"Subtotal Biaya Bahan (untuk {vol_calc:.2f} {sat_calc}): **{format_rupiah(ahsp_breakdown['subtotal_bahan'])}**")
-                else:
-                    st.caption("Detail material mengikuti satuan standar pekerjaan.")
-
-            st.markdown(f"""
-            <div style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:8px; padding:10px 14px; margin-top:8px; font-size:0.85rem; color:#1e293b;">
-                <b>Ringkasan Biaya ({vol_calc:.2f} {sat_calc} | {kode_item}):</b> Tenaga + Bahan = <b>{format_rupiah(ahsp_breakdown['subtotal_langsung'])}</b> | Overhead &amp; Profit (15%) = <b>{format_rupiah(ahsp_breakdown['overhead_15'])}</b> | HSP/{sat_calc} = <b>{format_rupiah(res.get('harga_satuan', 0))}</b> &rarr; <b>Total Estimasi Anggaran: {format_rupiah(res.get('total_biaya', 0))}</b>
-            </div>
-            """, unsafe_allow_html=True)
 
         # Tampilan Tabel Matriks Penilaian Kondisi Fisik & Fungsi (IKBG) Sesuai Standar
         eval_ui = compute_condition_assessment(res)
@@ -4576,33 +4512,34 @@ if menu == "📊 Dashboard Utama & Input Data":
                 </div>
                 """, unsafe_allow_html=True)
 
-        # Langkah-Langkah Perbaikan (Tampilan Baru Grid Tahapan Terstruktur) & Rekomendasi
-        st.markdown("#### 🛠️ Langkah-Langkah Perbaikan & Metode Kerja Standar")
-        steps_list = res.get("langkah_kerja", [])
-        if steps_list:
-            cards_items = "".join(
-                f'<div class="repair-step-card">'
-                f'<div class="repair-step-badge">TAHAP {idx}</div>'
-                f'<div class="repair-step-body">{html.escape(str(step))}</div>'
-                f'</div>'
-                for idx, step in enumerate(steps_list, start=1)
-            )
-            cards_html = f'<div class="repair-steps-grid">{cards_items}</div>'
-            st.markdown(cards_html, unsafe_allow_html=True)
+        # Langkah-Langkah Perbaikan & Metode Kerja Standar (Format Tabel Standar seperti Formulir IKBG)
+        with st.expander("🛠️ Langkah-Langkah Perbaikan & Metode Kerja Standar", expanded=True):
+            steps_list = res.get("langkah_kerja", [])
+            if steps_list:
+                df_steps = pd.DataFrame([
+                    {
+                        "Tahapan": f"Tahap {idx}",
+                        "Uraian Prosedur & Metode Kerja Standar": step
+                    }
+                    for idx, step in enumerate(steps_list, start=1)
+                ])
+                st.dataframe(df_steps, use_container_width=True, hide_index=True)
+            else:
+                st.write("Metode kerja mengikuti petunjuk teknis AHSP pekerjaan terkait.")
 
-        st.info(f"💡 **Rekomendasi Pemeliharaan Teknis:** {res.get('rekomendasi')}")
+            st.info(f"💡 **Rekomendasi Pemeliharaan Teknis:** {res.get('rekomendasi')}")
 
-        # Tombol Unduh Laporan Resmi PDF (Tanpa Excel sesuai Revisi)
+        # Tombol Unduh Formulir Data Kerusakan PDF (Tanpa Excel sesuai Revisi)
         single_record_pdf = PDFReportGenerator.generate_pdf_report(
             [res],
-            title_doc=f"Laporan Penilaian - {res.get('elemen_gedung')}",
+            title_doc="Formulir Data Kerusakan",
             annotated_image_bytes=st.session_state.get("annotated_img_bytes"),
             signer_info=st.session_state.get("signer_info")
         )
         st.download_button(
-            label="📄 Unduh Laporan Resmi Penilaian, Prosentase & RAB (PDF)",
+            label="📄 Unduh Formulir Data Kerusakan & RAB (PDF)",
             data=single_record_pdf,
-            file_name=f"Laporan_PBG_ID_{res.get('db_id')}_{res.get('kode_ahsp')}.pdf",
+            file_name=f"Formulir_Data_Kerusakan_ID_{res.get('db_id')}_{res.get('kode_ahsp')}.pdf",
             mime="application/pdf",
             type="primary",
             use_container_width=True
@@ -4633,10 +4570,7 @@ elif menu == "📜 Riwayat Inspeksi Gedung":
                 <span class="live-dot"></span> DATABASE TERHUBUNG
             </div>
         </div>
-        <div class="hero-title">Log Riwayat Penilaian Kondisi Bangunan Gedung</div>
-        <div class="hero-subtitle">
-            Daftar seluruh riwayat inspeksi yang tersimpan di dalam database SQLite. Menyediakan ringkasan KPI, filter data elemen gedung, dan fasilitas ekspor laporan resmi PDF bersertifikasi standar IKBG &amp; AHSP Jateng 2023.
-        </div>
+        <div class="hero-title" style="margin-bottom:0 !important;">Log Riwayat Penilaian Kondisi Bangunan Gedung</div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -4872,11 +4806,10 @@ elif menu == "📜 Riwayat Inspeksi Gedung":
             pct_r = float(eval_row["persentase_kerusakan"])
             table_display.append({
                 "ID": r["id"],
-                "Tanggal": str(r["tanggal"])[:16] if r.get("tanggal") else "-",
+                "Tanggal & Waktu": str(r["tanggal"]) if r.get("tanggal") else "-",
                 "Gedung": r.get("nama_gedung", "Gedung Kuliah Terpadu"),
                 "Ruangan": r.get("lokasi_lantai", "Lantai 2 - Ruang 204"),
                 "Objek Inspeksi": r.get("objek_inspeksi", r["elemen_gedung"]),
-                "Inspektor": r.get("surveyor", "Ahmad Fajar, S.T."),
                 "Koordinat": r.get("koordinat_lokasi", "-"),
                 "Jenis Kerusakan": r["jenis_kerusakan"],
                 "Kode AHSP": r["kode_ahsp"],
@@ -4891,44 +4824,29 @@ elif menu == "📜 Riwayat Inspeksi Gedung":
         df_display = pd.DataFrame(table_display)
         st.dataframe(df_display, use_container_width=True, hide_index=True)
 
-        # Baris Tombol Aksi Ekspor (PDF & CSV) & Hapus Data (Tanpa Excel sesuai Revisi)
+        # Baris Tombol Aksi Ekspor (Hanya PDF sesuai Revisi)
         st.markdown("""
         <div style="background: #ffffff; border: 1.5px solid #cbd5e1; border-radius: 14px; padding: 16px 20px; margin-top: 20px; margin-bottom: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.03);">
             <div style="font-size: 0.95rem; font-weight: 800; color: #0f172a; display: flex; align-items: center; gap: 8px;">
-                <span>📥</span> <span>Opsi Ekspor Laporan Resmi &amp; Arsip Pemeriksaan:</span>
+                <span>📥</span> <span>Opsi Ekspor Laporan Resmi Pemeriksaan:</span>
             </div>
         </div>
         """, unsafe_allow_html=True)
 
-        col_act1, col_act2 = st.columns(2)
-
-        with col_act1:
-            # Ekspor PDF Resmi ReportLab
-            pdf_data = PDFReportGenerator.generate_pdf_report(
-                filtered_records,
-                title_doc="Laporan Pemeliharaan Gedung Jawa Tengah",
-                signer_info=st.session_state.get("signer_info")
-            )
-            st.download_button(
-                label="📄 Ekspor Laporan Resmi IKBG & RAB (PDF)",
-                data=pdf_data,
-                file_name=f"Laporan_Resmi_PBG_Jateng_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
-                mime="application/pdf",
-                type="primary",
-                use_container_width=True
-            )
-
-        with col_act2:
-            # Ekspor CSV
-            csv_data = df_all.to_csv(index=False).encode('utf-8')
-            st.download_button(
-                label="📑 Unduh Database Arsip (CSV)",
-                data=csv_data,
-                file_name=f"Data_Inspeksi_{datetime.now().strftime('%Y%m%d')}.csv",
-                mime="text/csv",
-                type="secondary",
-                use_container_width=True
-            )
+        # Ekspor PDF Resmi ReportLab (Tanpa Excel/CSV)
+        pdf_data = PDFReportGenerator.generate_pdf_report(
+            filtered_records,
+            title_doc="Formulir Data Kerusakan",
+            signer_info=st.session_state.get("signer_info")
+        )
+        st.download_button(
+            label="📄 Ekspor Formulir Data Kerusakan (PDF)",
+            data=pdf_data,
+            file_name=f"Formulir_Data_Kerusakan_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
+            mime="application/pdf",
+            type="primary",
+            use_container_width=True
+        )
 
         st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
         col_mgt1, col_mgt2 = st.columns([2.2, 1.0])
